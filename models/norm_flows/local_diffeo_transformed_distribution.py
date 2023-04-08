@@ -157,7 +157,8 @@ class ConditionalLocalDiffeoTransformedDistribution:
         # self.base_dist, instead of passing as a transform to here.
         # Upon calling self.base_dist.condition(context), base_dist becomes a TransformedDistribution.
         return LocalDiffeoTransformedDistribution(base_distribution=base_dist,
-                                                  transforms=self.transforms)
+                                                  transforms=self.transforms,
+                                                  validate_args=False)
 
     def clear_cache(self):
         pass

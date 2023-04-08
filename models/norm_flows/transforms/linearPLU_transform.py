@@ -10,8 +10,8 @@ from pyro.distributions.torch_transform import TransformModule
 
 
 class ConditionedLinearPLUTransform(Transform):
-    domain = constraints.real
-    codomain = constraints.real
+    domain = constraints.real_vector
+    codomain = constraints.real_vector
     bijective = True
     event_dim = 1
 
@@ -88,8 +88,8 @@ class LinearPLUTransform(ConditionedLinearPLUTransform, TransformModule):
     """
     Adapted from pyro's GeneralizedChannelPermute.
     """
-    domain = constraints.real
-    codomain = constraints.real
+    domain = constraints.real_vector
+    codomain = constraints.real_vector
     bijective = True
     event_dim = 1
 
@@ -121,8 +121,8 @@ class LinearPLUTransform(ConditionedLinearPLUTransform, TransformModule):
 
 
 class ConditionalLinearPLUTransform(ConditionalTransformModule):
-    domain = constraints.real
-    codomain = constraints.real
+    domain = constraints.real_vector
+    codomain = constraints.real_vector
     bijective = True
     event_dim = 1
 

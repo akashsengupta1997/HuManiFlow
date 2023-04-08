@@ -15,8 +15,8 @@ from utils.rigid_transform_utils import (
 class SO3ExpCompactTransform(LocalDiffeoTransform):
     """Assumes underlying distribution has compact support only in the <2pi open ball."""
 
-    domain = constraints.real
-    codomain = constraints.real
+    domain = constraints.real_vector
+    codomain = constraints.real_vector
 
     event_dim = 1
 
