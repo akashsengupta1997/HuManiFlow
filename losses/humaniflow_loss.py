@@ -52,7 +52,7 @@ class HumaniflowLoss(nn.Module):
 
         # Selecting visible 2D joint targets and predictions
         target_joints2D = target_joints2D[:, None, :, :].expand_as(pred_joints2D)
-        target_joints2D_vis = target_joints2D_vis[:, None, :].expand(-1, self.loss_cfg.NUM_J2D_SAMPLES, -1)
+        target_joints2D_vis = target_joints2D_vis[:, None, :].expand(-1, pred_joints2D.shape[1], -1)
         pred_joints2D = pred_joints2D[target_joints2D_vis, :]
         target_joints2D = target_joints2D[target_joints2D_vis, :]
 

@@ -8,7 +8,7 @@ import argparse
 
 from configs import paths
 from utils.cam_utils import perspective_project_torch
-from models.smpl_official import SMPL
+from models.smpl import SMPL
 
 
 def rotate_2d(pt_2d, rot_rad):

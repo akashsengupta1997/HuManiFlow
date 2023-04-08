@@ -11,7 +11,7 @@ from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTrack
 from utils.checkpoint_utils import load_training_info_from_checkpoint
 from utils.train_utils import check_for_nans_in_output
 from utils.cam_utils import perspective_project_torch, orthographic_project_torch
-from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
+from utils.rigid_transform_utils import aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch, convert_densepose_seg_to_14part_labels, \
     ALL_JOINTS_TO_H36M_MAP, ALL_JOINTS_TO_COCO_MAP, H36M_TO_J14
 from utils.joints2d_utils import check_joints2d_visibility_torch, check_joints2d_occluded_torch
@@ -107,8 +107,6 @@ def train_humaniflow(humaniflow_model,
                 humaniflow_model.pose_so3flow_transform_modules.eval()
 
             for batch_num, samples_batch in enumerate(tqdm(dataloaders[split])):
-                if batch_num == 3:
-                    break
                 #############################################################
                 # ---------------- SYNTHETIC DATA GENERATION ----------------
                 #############################################################
@@ -147,7 +145,7 @@ def train_humaniflow(humaniflow_model,
                     target_joints_all = target_smpl_output.joints
                     target_joints_h36mlsp = target_joints_all[:, ALL_JOINTS_TO_H36M_MAP, :][:, H36M_TO_J14, :]
 
-                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
+                    target_tpose_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
                                                          global_orient=torch.zeros_like(target_pose)[:, :3],
                                                          betas=target_shape).vertices
 
@@ -246,51 +244,6 @@ def train_humaniflow(humaniflow_model,
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
                     proxy_rep_input = torch.cat([edge_in, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
 
-                    # For debugging
-                    import matplotlib
-                    matplotlib.use('tkagg')
-                    import matplotlib.pyplot as plt
-                    plt.figure()
-                    subplot_count = 1
-                    for i in [1, 20, 30]:
-                        heatmaps_to_plot = np.sum(proxy_rep_input[i, -17:, :, :].detach().cpu().numpy(), axis=0)
-                        image_to_plot = np.transpose(proxy_rep_input[i, :-17, :, :].detach().cpu().numpy(), [1, 2, 0])
-                        image_to_plot = image_to_plot + heatmaps_to_plot[:, :, None]
-                        plt.subplot(3,2,subplot_count)
-                        plt.imshow(image_to_plot)
-                        j2d_vis_colours = 0. + target_joints2d_visib_coco[i].cpu().detach().numpy().astype(np.float32)
-                        plt.scatter(target_joints2d_coco[i, :, 0].detach().cpu().numpy(),
-                                    target_joints2d_coco[i, :, 1].detach().cpu().numpy(),
-                                    s=1.0,
-                                    c=j2d_vis_colours)
-                        plt.scatter(target_joints2d_coco_input[i, :, 0].detach().cpu().numpy(),
-                                    target_joints2d_coco_input[i, :, 1].detach().cpu().numpy(),
-                                    s=1.0,
-                                    c='green')
-                        for j in range(target_joints2d_coco.shape[1]):
-                            plt.text(target_joints2d_coco[i, j, 0].detach().cpu().numpy(),
-                                     target_joints2d_coco[i, j, 1].detach().cpu().numpy(),
-                                     j,
-                                     fontsize=9)
-                            plt.text(target_joints2d_coco_input[i, j, 0].detach().cpu().numpy(),
-                                     target_joints2d_coco_input[i, j, 1].detach().cpu().numpy(),
-                                     j,
-                                     fontsize=9)
-                        subplot_count += 1
-                        plt.subplot(3,2,subplot_count)
-                        plt.scatter(target_vertices[i, :, 0].detach().cpu().numpy(),
-                                    target_vertices[i, :, 1].detach().cpu().numpy(),
-                                    s=0.01)
-                        plt.gca().set_aspect('equal', adjustable='box')
-                        subplot_count += 1
-                    plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
-                                        hspace=0, wspace=0)
-                    plt.margins(0, 0)
-                    plt.gca().xaxis.set_major_locator(plt.NullLocator())
-                    plt.gca().yaxis.set_major_locator(plt.NullLocator())
-                    plt.show()
-                    matplotlib.use('agg')
-
                 with torch.set_grad_enabled(split == 'train'):
                     #############################################################
                     # ---------------------- FORWARD PASS -----------------------
@@ -362,7 +315,9 @@ def train_humaniflow(humaniflow_model,
 
                         pred_joints2d_coco_samples = orthographic_project_torch(pred_joints_coco_samples,
                                                                                 pred['cam_wp'][:, None, :].expand(-1, humaniflow_cfg.LOSS.NUM_J2D_SAMPLES, -1).reshape(-1, 3))
-                        pred_joints2d_coco_samples = pred_joints2d_coco_samples.reshape(-1, humaniflow_cfg.LOSS.NUM_J2D_SAMPLES, pred_joints_coco_samples.shape[1], 2)  # (bs, num samples, 17, 2)
+                        pred_joints2d_coco_samples = pred_joints2d_coco_samples.reshape(-1,
+                                                                                        humaniflow_cfg.LOSS.NUM_J2D_SAMPLES,
+                                                                                        pred_joints_coco_samples.shape[1], 2)  # (bs, num samples, 17, 2)
 
                         if criterion.loss_cfg.J2D_LOSS_ON == 'point_est+samples':
                             pred_joints2d_coco_samples = torch.cat([pred_joints2d_coco_point_est[:, None, :, :],
@@ -413,8 +368,8 @@ def train_humaniflow(humaniflow_model,
                                                  pred_dict=pred_dict_for_loss,
                                                  target_dict=target_dict_for_loss,
                                                  batch_size=humaniflow_cfg.TRAIN.BATCH_SIZE,
-                                                 pred_reposed_vertices=pred_tpose_vertices_point_est,
-                                                 target_reposed_vertices=target_reposed_vertices)
+                                                 pred_tpose_vertices=pred_tpose_vertices_point_est,
+                                                 target_tpose_vertices=target_tpose_vertices)
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

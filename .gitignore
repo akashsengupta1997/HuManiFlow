@@ -131,3 +131,6 @@ dmypy.json
 # Training and Model files
 ./train_files/
 ./model_files/
+
+# Experiment logs
+./experiments/
