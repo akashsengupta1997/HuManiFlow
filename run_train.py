@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import torch.optim as optim
 import argparse
@@ -6,8 +7,8 @@ import argparse
 from data.on_the_fly_smpl_train_dataset import OnTheFlySMPLTrainDataset
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
-from models.humaniflow import HumaniflowModel
-from models.smpl_official import SMPL
+from models.humaniflow_model import HumaniflowModel
+from models.smpl import SMPL
 from models.canny_edge_detector import CannyEdgeDetector
 
 from losses.humaniflow_loss import HumaniflowLoss
@@ -90,7 +91,7 @@ def run_train(device,
                                              projection_type='perspective',
                                              perspective_focal_length=humaniflow_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
                                              render_rgb=True,
-                                             bin_size=32)
+                                             bin_size=None)
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = HumaniflowLoss(loss_cfg=humaniflow_cfg.LOSS,
@@ -102,6 +103,10 @@ def run_train(device,
     if resume_from_epoch is not None:
         humaniflow_model.load_state_dict(checkpoint['model_state_dict'])
         optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
+
+    # Set seeds
+    np.random.seed(0)
+    torch.manual_seed(0)
 
     train_humaniflow(humaniflow_model=humaniflow_model,
                      humaniflow_cfg=humaniflow_cfg,

@@ -87,17 +87,17 @@ class HumaniflowModel(nn.Module):
             num_ancestors = len(self.ancestors_dict[bodypart])
             # Input to fc_flow_context is input/shape/glob/cam features and 3x3 rotmats for all ancestors
             self.fc_flow_context.append(nn.Linear(model_cfg.INPUT_SHAPE_GLOB_CAM_FEATS_DIM + num_ancestors * 9,
-                                                  model_cfg.FLOW_CONTEXT_DIM))
+                                                  model_cfg.NORM_FLOW.CONTEXT_DIM))
             # Set up normalising flow distribution on Lie algebra so(3) for each bodypart.
             so3flow_dist, so3flow_transform_modules, so3flow_transforms = create_conditional_norm_flow(
                 device=device,
                 event_dim=3,
-                context_dim=model_cfg.FLOW_CONTEXT_DIM,
+                context_dim=model_cfg.NORM_FLOW.CONTEXT_DIM,
                 num_transforms=model_cfg.NORM_FLOW.NUM_TRANSFORMS,
                 transform_type=model_cfg.NORM_FLOW.TRANSFORM_TYPE,
                 transform_hidden_dims=model_cfg.NORM_FLOW.TRANSFORM_NN_HIDDEN_DIMS,
                 permute_type=model_cfg.NORM_FLOW.PERMUTE_TYPE,
-                permute_hidden_dims=model_cfg.NORM_FLOW.PERMUTE_HIDDEN_DIMS,
+                permute_hidden_dims=model_cfg.NORM_FLOW.PERMUTE_NN_HIDDEN_DIMS,
                 bound=model_cfg.NORM_FLOW.COMPACT_SUPPORT_RADIUS,
                 count_bins=model_cfg.NORM_FLOW.NUM_SPLINE_SEGMENTS,
                 radial_tanh_radius=model_cfg.NORM_FLOW.COMPACT_SUPPORT_RADIUS,
@@ -250,7 +250,7 @@ class HumaniflowModel(nn.Module):
         shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
         shape_mode = shape_params[:, :self.num_shape_params]
         shape_log_std = shape_params[:, self.num_shape_params:]
-        shape_dist = Normal(loc=shape_mode, scale=torch.exp(shape_log_std))
+        shape_dist = Normal(loc=shape_mode, scale=torch.exp(shape_log_std), validate_args=False)
         if num_samples > 0:
             if use_shape_mode_for_samples:
                 shape_samples = shape_mode[:, None, :].expand(-1, num_samples, -1)  # (bsize, num_samples, num_shape_params)
@@ -320,18 +320,19 @@ class HumaniflowModel(nn.Module):
                 conditioned_pose_SO3flow_dists_for_loglik.append(self.pose_SO3flow_dists[bodypart].condition(so3flow_context_for_loglik))
 
         return_dict = {'cam_wp': cam,
-                       'glob_rotmat': glob_R}
+                       'glob_rotmat': glob_R,
+                       'shape_mode': shape_mode,
+                       'shape_log_std': shape_log_std,
+                       'shape_dist_for_loglik': shape_dist}
         if compute_point_est:
             return_dict['pose_rotvecs_point_est'] = pose_so3_point_est
             return_dict['pose_rotmats_point_est'] = pose_SO3_point_est
-            return_dict['shape_mode'] = shape_mode
         if num_samples > 0:
             return_dict['pose_rotmats_samples'] = pose_SO3_samples
             return_dict['shape_samples'] = shape_samples
         if compute_for_loglik:
             return_dict['conditioned_pose_so3flow_dists_for_loglik'] = conditioned_pose_so3flow_dists_for_loglik
             return_dict['conditioned_pose_SO3flow_dists_for_loglik'] = conditioned_pose_SO3flow_dists_for_loglik
-            return_dict['shape_dist_for_loglik'] = shape_dist
 
         if return_input_feats:
             return_dict['input_feats'] = input_feats

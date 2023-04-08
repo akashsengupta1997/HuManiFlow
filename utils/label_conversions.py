@@ -11,7 +11,7 @@ COCO_JOINTS = {
     'Nose': 0
 }
 
-# The SMPL model (im smpl_official.py) returns a large superset of joints.
+# The SMPL model (im smpl.py) returns a large superset of joints.
 # Different subsets are used during training - e.g. H36M 3D joints convention and COCO 2D joints convention.
 # Joint label conversions from SMPL to H36M/COCO/LSP
 ALL_JOINTS_TO_COCO_MAP = [24, 26, 25, 28, 27, 16, 17, 18, 19, 20, 21, 1, 2, 4, 5, 7, 8]  # Using OP Hips
@@ -152,10 +152,10 @@ def convert_heatmaps_to_2Djoints_coordinates_torch(joints2D_heatmaps,
     joints2D_vis = max_vals_flat > eps
 
     if gaussian_heatmaps:
-        # If heatmaps are Gaussians, maxvals for all heatmaps should be the same,
-        # If maxval is less, then Gaussian centre is not in the image, and should be counted as invisible.
+        # If heatmaps are Gaussians, maxvals for all heatmaps should be the approximately the same.
+        # If maxval is less, then Gaussian heatmap centre is not in the image, and should be counted as invisible.
         gaussian_maxval = max_vals_flat.max()
-        joints2D_vis = torch.logical_and(joints2D_vis, max_vals_flat > (gaussian_maxval - eps))
+        joints2D_vis = torch.logical_and(joints2D_vis, max_vals_flat > (gaussian_maxval - 1e-2))
 
     joints2D[torch.logical_not(joints2D_vis)] = -1000
 

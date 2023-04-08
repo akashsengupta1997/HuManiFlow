@@ -91,16 +91,16 @@ class TrainingLossesAndMetricsTracker:
                          pred_dict,
                          target_dict,
                          batch_size,
-                         pred_reposed_vertices=None,
-                         target_reposed_vertices=None):
+                         pred_tpose_vertices=None,
+                         target_tpose_vertices=None):
         assert split in ['train', 'val'], "Invalid split in metric tracker batch update."
 
         if any(['PVE-T' in metric_type for metric_type in self.metrics_to_track]):
-            assert (pred_reposed_vertices is not None) and \
-                   (target_reposed_vertices is not None), \
-                "Need to pass reposed vertices to metric tracker batch update."
-            pred_reposed_vertices = pred_reposed_vertices.cpu().detach().numpy()
-            target_reposed_vertices = target_reposed_vertices.cpu().detach().numpy()
+            assert (pred_tpose_vertices is not None) and \
+                   (target_tpose_vertices is not None), \
+                "Need to pass T-pose vertices to metric tracker batch update."
+            pred_tpose_vertices = pred_tpose_vertices.cpu().detach().numpy()
+            target_tpose_vertices = target_tpose_vertices.cpu().detach().numpy()
 
         for key in pred_dict.keys():
             pred_dict[key] = pred_dict[key].cpu().detach().numpy()
@@ -116,13 +116,13 @@ class TrainingLossesAndMetricsTracker:
 
         # -------- Update metrics sums --------
         if 'PVE' in self.metrics_to_track:
-            pve_batch = np.linalg.norm(pred_dict['verts'] - target_dict['verts'], axis=-1)  # (bsize, 6890) or (bsize, num views, 6890)
+            pve_batch = np.linalg.norm(pred_dict['verts3D'] - target_dict['verts3D'], axis=-1)  # (bsize, 6890) or (bsize, num views, 6890)
             self.loss_metric_sums[split + '_PVE'] += np.sum(pve_batch)  # scalar
 
         # Scale and translation correction
         if 'PVE-SC' in self.metrics_to_track:
-            pred_vertices = pred_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
-            target_vertices = target_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
+            pred_vertices = pred_dict['verts3D']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
+            target_vertices = target_dict['verts3D']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
             pred_vertices_sc = scale_and_translation_transform_batch(pred_vertices.reshape(-1, 6890, 3),
                                                                      target_vertices.reshape(-1, 6890, 3))
             pve_sc_batch = np.linalg.norm(pred_vertices_sc - target_vertices.reshape(-1, 6890, 3), axis=-1)  # (bsize, 6890) or (bsize*num views, 6890)
@@ -130,23 +130,23 @@ class TrainingLossesAndMetricsTracker:
 
         # Procrustes analysis
         if 'PVE-PA' in self.metrics_to_track:
-            pred_vertices = pred_dict['verts']  # (bsize, 6890, 3)  or (bsize, num views, 6890, 3)
-            target_vertices = target_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
+            pred_vertices = pred_dict['verts3D']  # (bsize, 6890, 3)  or (bsize, num views, 6890, 3)
+            target_vertices = target_dict['verts3D']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
             pred_vertices_pa = procrustes_analysis_batch(pred_vertices.reshape(-1, 6890, 3),
                                                          target_vertices.reshape(-1, 6890, 3))
             pve_pa_batch = np.linalg.norm(pred_vertices_pa - target_vertices.reshape(-1, 6890, 3), axis=-1)  # (bsize, 6890) or (bsize*num views, 6890)
             self.loss_metric_sums[split + '_PVE-PA'] += np.sum(pve_pa_batch)  # scalar
 
-        # Reposed
+        # T-Pose
         if 'PVE-T' in self.metrics_to_track:
-            pvet_batch = np.linalg.norm(pred_reposed_vertices - target_reposed_vertices, axis=-1)
+            pvet_batch = np.linalg.norm(pred_tpose_vertices - target_tpose_vertices, axis=-1)
             self.loss_metric_sums[split + '_PVE-T'] += np.sum(pvet_batch)
 
-        # Reposed + Scale and translation correction
+        # T-Pose + Scale and translation correction
         if 'PVE-T-SC' in self.metrics_to_track:
-            pred_reposed_vertices_sc = scale_and_translation_transform_batch(pred_reposed_vertices,
-                                                                             target_reposed_vertices)
-            pvet_sc_batch = np.linalg.norm(pred_reposed_vertices_sc - target_reposed_vertices, axis=-1)  # (bs, 6890)
+            pred_tpose_vertices_sc = scale_and_translation_transform_batch(pred_tpose_vertices,
+                                                                             target_tpose_vertices)
+            pvet_sc_batch = np.linalg.norm(pred_tpose_vertices_sc - target_tpose_vertices, axis=-1)  # (bs, 6890)
             self.loss_metric_sums[split + '_PVE-T-SC'] += np.sum(pvet_sc_batch)  # scalar
 
         if 'MPJPE' in self.metrics_to_track:

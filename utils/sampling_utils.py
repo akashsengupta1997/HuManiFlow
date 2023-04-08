@@ -19,6 +19,20 @@ def so3_uniform_sampling_torch(num_matrices):
     return quat_to_rotmat(random_quat)
 
 
+def compute_vertex_variance_from_samples(vertices_samples):
+    """
+
+    :param vertices_samples: (N, 6890, 3)
+    :return:
+    """
+    mean_vertices = torch.mean(vertices_samples, dim=0)
+    diff_from_mean = vertices_samples - mean_vertices
+    directional_vertex_variances = torch.sqrt(torch.mean(diff_from_mean ** 2, dim=0))  # (6890, 3)
+    avg_vertex_l2_distance_from_mean = torch.norm(diff_from_mean, dim=-1).mean(dim=0)  # (6890,)
+
+    return avg_vertex_l2_distance_from_mean, directional_vertex_variances
+
+
 def joints2D_error_sorted_verts_sampling(pred_vertices_samples,
                                          pred_joints_samples,
                                          input_joints2D_heatmaps,

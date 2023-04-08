@@ -47,7 +47,8 @@ def create_conditional_norm_flow(device,
         perm_cycle = cycle([torch.tensor(idx[i:] + idx[:i], dtype=torch.long, device=device) for i in range(event_dim)])
 
     base_dist = Independent(Normal(loc=torch.zeros(event_dim, device=device),
-                                   scale=torch.ones(event_dim, device=device) * base_dist_std),
+                                   scale=torch.ones(event_dim, device=device) * base_dist_std,
+                                   validate_args=False),
                             reinterpreted_batch_ndims=1)
 
     transforms = []
