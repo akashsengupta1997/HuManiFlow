@@ -110,8 +110,10 @@ def predict_humaniflow(humaniflow_model,
             # - Pose/shape point estimate from predicted distribution
 
             # Save predicted outputs (useful for post-processing optimisation)
-            save_pred_output(pred,
-                             os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_pred.npz'))
+            save_pred_output(hrnet_output=hrnet_output,
+                             cropped_for_proxy=cropped_for_proxy,
+                             humaniflow_output=pred,
+                             save_path=os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_pred.npz'))
 
             # Compute SMPL point estimates and process for visualisation
             pred_smpl_output_point_est = smpl_model(body_pose=pred['pose_rotmats_point_est'],
