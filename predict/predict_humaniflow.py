@@ -104,7 +104,8 @@ def predict_humaniflow(humaniflow_model,
             # ------------------------------- POSE AND SHAPE DISTRIBUTION PREDICTION -------------------------------
             pred = humaniflow_model(proxy_rep_input,
                                     num_samples=num_pred_samples,
-                                    use_shape_mode_for_samples=True)
+                                    use_shape_mode_for_samples=True,
+                                    return_input_feats=True)
             # pred is a dict containing:
             # - Pose/shape samples from predicted distribution
             # - Pose/shape point estimate from predicted distribution
