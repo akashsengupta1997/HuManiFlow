@@ -9,12 +9,15 @@ from predict.predict_hrnet import predict_hrnet
 
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
-from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine, batch_crop_opencv_affine
-from utils.cam_utils import orthographic_project_torch
-from utils.joints2d_utils import undo_keypoint_normalisation
+from utils.image_utils import batch_crop_pytorch_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch
 from utils.rigid_transform_utils import aa_rotate_translate_points_pytorch3d
 from utils.sampling_utils import compute_vertex_variance_from_samples, joints2D_error_sorted_verts_sampling
+from utils.predict_utils import save_pred_output
+from utils.visualise_utils import (render_point_est_visualisation,
+                                   render_samples_visualisation,
+                                   uncrop_point_est_visualisation,
+                                   plot_xyz_vertex_variance)
 
 
 def predict_humaniflow(humaniflow_model,
@@ -42,7 +45,6 @@ def predict_humaniflow(humaniflow_model,
                                             projection_type='orthographic',
                                             render_rgb=True,
                                             bin_size=32)
-    plain_texture = torch.ones(1, 1200, 800, 3, device=device).float() * 0.7
     lights_rgb_settings = {'location': torch.tensor([[0., -0.8, -2.0]], device=device, dtype=torch.float32),
                            'ambient_color': 0.5 * torch.ones(1, 3, device=device, dtype=torch.float32),
                            'diffuse_color': 0.3 * torch.ones(1, 3, device=device, dtype=torch.float32),
@@ -107,6 +109,10 @@ def predict_humaniflow(humaniflow_model,
             # - Pose/shape samples from predicted distribution
             # - Pose/shape point estimate from predicted distribution
 
+            # Save predicted outputs (useful for post-processing optimisation)
+            save_pred_output(pred,
+                             os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_pred.npz'))
+
             # Compute SMPL point estimates and process for visualisation
             pred_smpl_output_point_est = smpl_model(body_pose=pred['pose_rotmats_point_est'],
                                                     global_orient=pred['glob_rotmat'][:, None, :, :],
@@ -123,14 +129,14 @@ def predict_humaniflow(humaniflow_model,
                                                                                  axes=torch.tensor([0., 1., 0.], device=device),
                                                                                  angles=-np.pi / 2.,
                                                                                  translations=torch.zeros(3, device=device))
-            pred_vertices_rot180_mode = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot90_point_est,
-                                                                             axes=torch.tensor([0., 1., 0.], device=device),
-                                                                             angles=-np.pi / 2.,
-                                                                             translations=torch.zeros(3, device=device))
-            pred_vertices_rot270_mode = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot180_mode,
-                                                                             axes=torch.tensor([0., 1., 0.], device=device),
-                                                                             angles=-np.pi / 2.,
-                                                                             translations=torch.zeros(3, device=device))
+            pred_vertices_rot180_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot90_point_est,
+                                                                                  axes=torch.tensor([0., 1., 0.], device=device),
+                                                                                  angles=-np.pi / 2.,
+                                                                                  translations=torch.zeros(3, device=device))
+            pred_vertices_rot270_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot180_point_est,
+                                                                                  axes=torch.tensor([0., 1., 0.], device=device),
+                                                                                  angles=-np.pi / 2.,
+                                                                                  translations=torch.zeros(3, device=device))
 
             # Need to flip predicted T-pose vertices before projecting so that they project the right way up.
             pred_tpose_vertices_point_est = aa_rotate_translate_points_pytorch3d(points=smpl_model(betas=pred['shape_mode']).vertices,
@@ -138,10 +144,10 @@ def predict_humaniflow(humaniflow_model,
                                                                                  angles=np.pi,
                                                                                  translations=torch.zeros(3, device=device))  # (1, 6890, 3)
             # Rotating 90° about vertical axis for visualisation
-            pred_reposed_vertices_rot90_mean = aa_rotate_translate_points_pytorch3d(points=pred_tpose_vertices_point_est,
-                                                                                    axes=torch.tensor([0., 1., 0.], device=device),
-                                                                                    angles=-np.pi / 2.,
-                                                                                    translations=torch.zeros(3, device=device))
+            pred_tpose_vertices_rot90_point_est = aa_rotate_translate_points_pytorch3d(points=pred_tpose_vertices_point_est,
+                                                                                       axes=torch.tensor([0., 1., 0.], device=device),
+                                                                                       angles=-np.pi / 2.,
+                                                                                       translations=torch.zeros(3, device=device))
 
             # Compute SMPL samples and process for visualisation
             if visualise_samples:
@@ -154,11 +160,7 @@ def predict_humaniflow(humaniflow_model,
 
                 # Estimate per-vertex uncertainty - i.e. directional variance and average Euclidean distance from mean - by sampling
                 # SMPL poses/shapes and computing corresponding vertex meshes
-                per_vertex_avg_dist_from_mean, per_vertex_directional_variance = compute_vertex_variance_from_samples(pred_vertices_samples)
-                # Generate per-vertex uncertainty colourmap
-                vertex_var_norm = plt.Normalize(vmin=0.0, vmax=0.2, clip=True)
-                vertex_colours = plt.cm.jet(vertex_var_norm(per_vertex_avg_dist_from_mean.cpu().detach().numpy()))[:, :3]
-                vertex_colours = torch.from_numpy(vertex_colours[None, :, :]).to(device).float()
+                per_vertex_avg_dist_from_mean, per_vertex_xyz_variance = compute_vertex_variance_from_samples(pred_vertices_samples)
 
                 pred_vertices_samples = joints2D_error_sorted_verts_sampling(pred_vertices_samples=pred_vertices_samples,
                                                                              pred_joints_samples=pred_joints_samples,
@@ -185,185 +187,75 @@ def predict_humaniflow(humaniflow_model,
                                torch.ones(pred['cam_wp'].shape[0], 1, device=device).float() * 2.5],
                               dim=-1)
 
-            # Render point estimate visualisation outputs
-            body_vis_output = body_vis_renderer(vertices=pred_vertices_point_est,
-                                                cam_t=cam_t,
-                                                orthographic_scale=orthographic_scale,
-                                                lights_rgb_settings=lights_rgb_settings,
-                                                verts_features=vertex_colours)
-            cropped_for_proxy_rgb = torch.nn.functional.interpolate(cropped_for_proxy['rgb'],
+            cropped_for_proxy_rgb = torch.nn.functional.interpolate(cropped_for_proxy_rgb,
                                                                     size=(visualise_wh, visualise_wh),
                                                                     mode='bilinear',
                                                                     align_corners=False)
-            body_vis_rgb = batch_add_rgb_background(backgrounds=cropped_for_proxy_rgb,
-                                                    rgb=body_vis_output['rgb_images'].permute(0, 3, 1, 2).contiguous(),
-                                                    seg=body_vis_output['iuv_images'][:, :, :, 0].round())
-            body_vis_rgb = body_vis_rgb.cpu().detach().numpy()[0].transpose(1, 2, 0)
 
-            body_vis_rgb_rot90 = body_vis_renderer(vertices=pred_vertices_rot90_point_est,
-                                                   cam_t=fixed_cam_t,
-                                                   orthographic_scale=fixed_orthographic_scale,
-                                                   lights_rgb_settings=lights_rgb_settings,
-                                                   verts_features=vertex_colours)['rgb_images'].cpu().detach().numpy()[0]
-            body_vis_rgb_rot180 = body_vis_renderer(vertices=pred_vertices_rot180_mode,
-                                                    cam_t=fixed_cam_t,
-                                                    orthographic_scale=fixed_orthographic_scale,
-                                                    lights_rgb_settings=lights_rgb_settings,
-                                                    verts_features=vertex_colours)['rgb_images'].cpu().detach().numpy()[0]
-            body_vis_rgb_rot270 = body_vis_renderer(vertices=pred_vertices_rot270_mode,
-                                                    textures=plain_texture,
-                                                    cam_t=fixed_cam_t,
-                                                    orthographic_scale=fixed_orthographic_scale,
-                                                    lights_rgb_settings=lights_rgb_settings,
-                                                    verts_features=vertex_colours)['rgb_images'].cpu().detach().numpy()[0]
+            # Generate per-vertex uncertainty colourmap
+            vertex_uncertainty_norm = plt.Normalize(vmin=0.0, vmax=0.2, clip=True)
+            vertex_uncertainty_colours = plt.cm.jet(vertex_uncertainty_norm(per_vertex_avg_dist_from_mean.cpu().detach().numpy()))[:, :3]
+            vertex_uncertainty_colours = torch.from_numpy(vertex_uncertainty_colours[None, :, :]).to(device).float()
 
-            # T-pose body visualisation
-            tpose_body_vis_rgb = body_vis_renderer(vertices=pred_tpose_vertices_point_est,
-                                                   textures=plain_texture,
-                                                   cam_t=fixed_cam_t,
-                                                   orthographic_scale=fixed_orthographic_scale,
-                                                   lights_rgb_settings=lights_rgb_settings)['rgb_images'].cpu().detach().numpy()[0]
-            tpose_body_vis_rgb_rot90 = body_vis_renderer(vertices=pred_reposed_vertices_rot90_mean,
-                                                         textures=plain_texture,
-                                                         cam_t=fixed_cam_t,
-                                                         orthographic_scale=fixed_orthographic_scale,
-                                                         lights_rgb_settings=lights_rgb_settings)['rgb_images'].cpu().detach().numpy()[0]
-
-            # Combine all visualisations
-            combined_vis_rows = 2
-            combined_vis_cols = 4
-            combined_vis_fig = np.zeros((combined_vis_rows * visualise_wh, combined_vis_cols * visualise_wh, 3),
-                                        dtype=body_vis_rgb.dtype)
-            # Cropped input image
-            combined_vis_fig[:visualise_wh, :visualise_wh] = cropped_for_proxy_rgb.cpu().detach().numpy()[0].transpose(1, 2, 0)
-
-            # Proxy representation + 2D joints scatter + 2D joints confidences
-            proxy_rep_input = proxy_rep_input[0].sum(dim=0).cpu().detach().numpy()
-            proxy_rep_input = np.stack([proxy_rep_input]*3, axis=-1)  # single-channel to RGB
-            proxy_rep_input = cv2.resize(proxy_rep_input, (visualise_wh, visualise_wh))
-            for joint_num in range(cropped_for_proxy['joints2D'].shape[1]):
-                hor_coord = cropped_for_proxy['joints2D'][0, joint_num, 0].item() * visualise_wh / humaniflow_cfg.DATA.PROXY_REP_SIZE
-                ver_coord = cropped_for_proxy['joints2D'][0, joint_num, 1].item() * visualise_wh / humaniflow_cfg.DATA.PROXY_REP_SIZE
-                cv2.circle(proxy_rep_input,
-                           (int(hor_coord), int(ver_coord)),
-                           radius=3,
-                           color=(255, 0, 0),
-                           thickness=-1)
-                cv2.putText(proxy_rep_input,
-                            str(joint_num),
-                            (int(hor_coord + 4), int(ver_coord + 4)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), lineType=2)
-                cv2.putText(proxy_rep_input,
-                            str(joint_num) + " {:.2f}".format(hrnet_output['joints2Dconfs'][joint_num].item()),
-                            (10, 16 * (joint_num + 1)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), lineType=2)
-            combined_vis_fig[visualise_wh:2*visualise_wh, :visualise_wh] = proxy_rep_input
-
-            # Posed 3D body
-            combined_vis_fig[:visualise_wh, visualise_wh:2*visualise_wh] = body_vis_rgb
-            combined_vis_fig[visualise_wh:2*visualise_wh, visualise_wh:2*visualise_wh] = body_vis_rgb_rot90
-            combined_vis_fig[:visualise_wh, 2*visualise_wh:3*visualise_wh] = body_vis_rgb_rot180
-            combined_vis_fig[visualise_wh:2*visualise_wh, 2*visualise_wh:3*visualise_wh] = body_vis_rgb_rot270
-
-            # T-pose 3D body
-            combined_vis_fig[:visualise_wh, 3*visualise_wh:4*visualise_wh] = tpose_body_vis_rgb
-            combined_vis_fig[visualise_wh:2*visualise_wh, 3*visualise_wh:4*visualise_wh] = tpose_body_vis_rgb_rot90
-
+            # Render and save point estimate visualisation
+            point_est_fig, point_est_mesh_render = render_point_est_visualisation(renderer=body_vis_renderer,
+                                                                                  joints2D=cropped_for_proxy['joints2D'],
+                                                                                  joints2D_confs=hrnet_output['joints2Dconfs'],
+                                                                                  proxy_rep_input=proxy_rep_input,
+                                                                                  cropped_for_proxy_rgb=cropped_for_proxy_rgb,
+                                                                                  pred_vertices_point_est_all_rot={'0': pred_vertices_point_est,
+                                                                                                                   '90': pred_vertices_rot90_point_est,
+                                                                                                                   '180': pred_vertices_rot180_point_est,
+                                                                                                                   '270': pred_vertices_rot270_point_est},
+                                                                                  pred_tpose_vertices_point_est_all_rot={'0': pred_tpose_vertices_point_est,
+                                                                                                                         '90': pred_tpose_vertices_rot90_point_est},
+                                                                                  vertex_colours=vertex_uncertainty_colours,
+                                                                                  cam_t=cam_t,
+                                                                                  fixed_cam_t=fixed_cam_t,
+                                                                                  orthographic_scale=orthographic_scale,
+                                                                                  fixed_orthographic_scale=fixed_orthographic_scale,
+                                                                                  lights_rgb_settings=lights_rgb_settings,
+                                                                                  visualise_wh=visualise_wh)
             cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_point_est.png'),
-                        combined_vis_fig[:, :, ::-1] * 255)
+                        point_est_fig[:, :, ::-1] * 255)
 
             if visualise_uncropped:
-                # Uncropped point estimate visualisation by projecting 3D body onto original image
-                rgb_to_uncrop = body_vis_output['rgb_images'].permute(0, 3, 1, 2).contiguous().cpu().detach().numpy()
-                iuv_to_uncrop = body_vis_output['iuv_images'].permute(0, 3, 1, 2).contiguous().cpu().detach().numpy()
-                bbox_centres = hrnet_output['bbox_centre'][None].cpu().detach().numpy()
-                bbox_whs = torch.max(hrnet_output['bbox_height'], hrnet_output['bbox_width'])[None].cpu().detach().numpy()
-                bbox_whs *= humaniflow_cfg.DATA.BBOX_SCALE_FACTOR
-                uncropped_for_visualise = batch_crop_opencv_affine(output_wh=(visualise_wh, visualise_wh),
-                                                                   num_to_crop=1,
-                                                                   rgb=rgb_to_uncrop,
-                                                                   iuv=iuv_to_uncrop,
-                                                                   bbox_centres=bbox_centres,
-                                                                   bbox_whs=bbox_whs,
-                                                                   uncrop=True,
-                                                                   uncrop_wh=(orig_image.shape[1], orig_image.shape[0]))
-                uncropped_rgb = uncropped_for_visualise['rgb'][0].transpose(1, 2, 0) * 255
-                uncropped_seg = uncropped_for_visualise['iuv'][0, 0, :, :]
-                background_pixels = uncropped_seg[:, :, None] == 0  # Body pixels are > 0
-                uncropped_rgb_with_background = uncropped_rgb * (np.logical_not(background_pixels)) + \
-                                                orig_image * background_pixels
-
+                # Render and save uncropped point estimate visualisation by projecting 3D body onto original image
+                uncropped_point_est_fig = uncrop_point_est_visualisation(
+                    cropped_mesh_render_rgb=point_est_mesh_render['rgb_images'].permute(0, 3, 1, 2).contiguous().cpu().detach().numpy(),
+                    cropped_mesh_render_iuv=point_est_mesh_render['iuv_images'].permute(0, 3, 1, 2).contiguous().cpu().detach().numpy(),
+                    bbox_centres=hrnet_output['bbox_centre'][None].cpu().detach().numpy(),
+                    bbox_whs=torch.max(hrnet_output['bbox_height'], hrnet_output['bbox_width'])[None].cpu().detach().numpy(),
+                    orig_image=orig_image,
+                    visualise_wh=visualise_wh,
+                    bbox_scale_factor=humaniflow_cfg.DATA.BBOX_SCALE_FACTOR)
                 cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_point_est_uncrop.png'),
-                            uncropped_rgb_with_background[:, :, ::-1])
+                            uncropped_point_est_fig[:, :, ::-1])
 
             if visualise_samples:
-                samples_rows = 3
-                samples_cols = 6
-                samples_fig = np.zeros((samples_rows * visualise_wh, samples_cols * visualise_wh, 3),
-                                       dtype=body_vis_rgb.dtype)
-                for i in range(num_vis_samples + 1):
-                    body_vis_output_sample = body_vis_renderer(vertices=pred_vertices_samples[[i]],
-                                                               cam_t=cam_t,
-                                                               orthographic_scale=orthographic_scale,
-                                                               lights_rgb_settings=lights_rgb_settings,
-                                                               verts_features=vertex_colours)
-                    body_vis_rgb_sample = batch_add_rgb_background(backgrounds=cropped_for_proxy_rgb,
-                                                                   rgb=body_vis_output_sample['rgb_images'].permute(0, 3, 1, 2).contiguous(),
-                                                                   seg=body_vis_output_sample['iuv_images'][:, :, :, 0].round())
-                    body_vis_rgb_sample = body_vis_rgb_sample.cpu().detach().numpy()[0].transpose(1, 2, 0)
-
-                    body_vis_rgb_rot90_sample = body_vis_renderer(vertices=pred_vertices_rot90_samples[[i]],
-                                                                  cam_t=fixed_cam_t,
-                                                                  orthographic_scale=fixed_orthographic_scale,
-                                                                  lights_rgb_settings=lights_rgb_settings,
-                                                                  verts_features=vertex_colours)['rgb_images'].cpu().detach().numpy()[0]
-
-                    row = (2 * i) // samples_cols
-                    col = (2 * i) % samples_cols
-                    samples_fig[row*visualise_wh:(row+1)*visualise_wh, col*visualise_wh:(col+1)*visualise_wh] = body_vis_rgb_sample
-
-                    row = (2 * i + 1) // samples_cols
-                    col = (2 * i + 1) % samples_cols
-                    samples_fig[row * visualise_wh:(row + 1) * visualise_wh, col * visualise_wh:(col + 1) * visualise_wh] = body_vis_rgb_rot90_sample
-
-                    cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + 'samples.png'),
-                                samples_fig[:, :, ::-1] * 255)
+                # Render and save samples visualisations
+                samples_fig = render_samples_visualisation(renderer=body_vis_renderer,
+                                                           num_vis_samples=num_vis_samples,
+                                                           samples_rows=3,
+                                                           samples_cols=6,
+                                                           visualise_wh=visualise_wh,
+                                                           cropped_for_proxy_rgb=cropped_for_proxy_rgb,
+                                                           pred_vertices_samples_all_rot={'0': pred_vertices_samples,
+                                                                                          '90': pred_vertices_rot90_samples},
+                                                           vertex_colours=vertex_uncertainty_colours,
+                                                           cam_t=cam_t,
+                                                           fixed_cam_t=fixed_cam_t,
+                                                           orthographic_scale=orthographic_scale,
+                                                           fixed_orthographic_scale=fixed_orthographic_scale,
+                                                           lights_rgb_settings=lights_rgb_settings)
+                cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + 'samples.png'),
+                            samples_fig[:, :, ::-1] * 255)
 
             if visualise_xyz_variance:
-                pred_vertices2D_mode = orthographic_project_torch(pred_vertices_point_est, pred['cam_wp'])
-                pred_vertices2D_mode = undo_keypoint_normalisation(pred_vertices2D_mode, visualise_wh).cpu().detach().numpy()[0]
-                per_vertex_directional_variance = per_vertex_directional_variance.cpu().detach().numpy()
-
-                norm = plt.Normalize(vmin=0.0, vmax=0.15, clip=True)
-                scatter_s = 0.25
-                img_alpha = 1.0
-                plt.style.use('dark_background')
-                titles = ['X-axis (Horizontal) Variance', 'Y-axis (Vertical) Variance', 'Z-axis (Depth) Variance']
-                plt.figure(figsize=(14, 10))
-                rows = 1
-                cols = 3
-                subplot_count = 1
-                for i in range(3):
-                    plt.subplot(rows, cols, subplot_count)
-                    plt.gca().axis('off')
-                    plt.title(titles[i])
-                    plt.imshow(cropped_for_proxy_rgb.cpu().detach().numpy()[0].transpose(1, 2, 0), alpha=img_alpha)
-                    plt.scatter(pred_vertices2D_mode[:, 0], pred_vertices2D_mode[:, 1],
-                                s=scatter_s,
-                                c=per_vertex_directional_variance[:, i],
-                                cmap='jet',
-                                norm=norm)
-                    subplot_count += 1
-                plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-                plt.margins(0, 0)
-                plt.gca().xaxis.set_major_locator(plt.NullLocator())
-                plt.gca().yaxis.set_major_locator(plt.NullLocator())
-                plt.savefig(os.path.join(save_dir, os.path.splitext(image_fname)[0] + 'xyz_variance.png'), bbox_inches='tight')
-                plt.close()
-
-
-
-
-
-
-
+                # Plot per-vertex directional (i.e. x/y/z-axis) variance (represents uncertainty)
+                plot_xyz_vertex_variance(pred_vertices_point_est=pred_vertices_point_est,
+                                         per_vertex_xyz_variance=per_vertex_xyz_variance.cpu().detach().numpy(),
+                                         cropped_for_proxy_rgb=cropped_for_proxy_rgb.cpu().detach().numpy()[0].transpose(1, 2, 0),
+                                         visualise_wh=visualise_wh,
+                                         cam_wp=pred['cam_wp'],
+                                         save_path=os.path.join(save_dir, os.path.splitext(image_fname)[0] + 'xyz_variance.png'))

@@ -51,7 +51,7 @@ def batch_add_rgb_background(backgrounds,
     """
     :param backgrounds: (bs, 3, wh, wh)
     :param rgb: (bs, 3, wh, wh)
-    :param iuv: (bs, wh, wh)
+    :param seg: (bs, wh, wh)
     :return: rgb_with_background: (bs, 3, wh, wh)
     """
     background_pixels = seg[:, None, :, :] == 0  # Body pixels are > 0 and out of frame pixels are -1

@@ -21,7 +21,7 @@ def aa_rotate_rotmats_pytorch3d(rotmats, axes, angles, rot_mult_order='post'):
     :param rotmats: (B, 3, 3), batch of rotation matrices
     :param axes: (B, 3) or (3,), rotation axes (may be batched)
     :param angles: (B, 1) or scalar, rotation angles in radians (may be batched)
-    :return: rotated_rotvecs (B, 3) and rotated_rotmats (B, 3, 3)
+    :return: rotated_axisangle (B, 3) and rotated_rotmats (B, 3, 3)
     """
     assert rot_mult_order in ['pre', 'post']
     r = axes * angles
@@ -32,9 +32,9 @@ def aa_rotate_rotmats_pytorch3d(rotmats, axes, angles, rot_mult_order='post'):
         rotated_rotmats = torch.matmul(rotmats, R)
     elif rot_mult_order == 'pre':
         rotated_rotmats = torch.matmul(R, rotmats)
-    rotated_rotvecs = so3_log_map(R=rotated_rotmats)
+    rotated_axisangle = so3_log_map(R=rotated_rotmats)
 
-    return rotated_rotvecs, rotated_rotmats
+    return rotated_axisangle, rotated_rotmats
 
 
 def aa_rotate_rotmats(axis, angle, rotmats, rot_mult_order='post'):

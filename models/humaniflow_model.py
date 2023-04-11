@@ -325,7 +325,7 @@ class HumaniflowModel(nn.Module):
                        'shape_log_std': shape_log_std,
                        'shape_dist_for_loglik': shape_dist}
         if compute_point_est:
-            return_dict['pose_rotvecs_point_est'] = pose_so3_point_est
+            return_dict['pose_axisangle_point_est'] = pose_so3_point_est
             return_dict['pose_rotmats_point_est'] = pose_SO3_point_est
         if num_samples > 0:
             return_dict['pose_rotmats_samples'] = pose_SO3_samples
