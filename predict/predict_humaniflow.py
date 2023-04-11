@@ -190,7 +190,7 @@ def predict_humaniflow(humaniflow_model,
                                torch.ones(pred['cam_wp'].shape[0], 1, device=device).float() * 2.5],
                               dim=-1)
 
-            cropped_for_proxy_rgb = torch.nn.functional.interpolate(cropped_for_proxy_rgb,
+            cropped_for_proxy_rgb = torch.nn.functional.interpolate(cropped_for_proxy['rgb'],
                                                                     size=(visualise_wh, visualise_wh),
                                                                     mode='bilinear',
                                                                     align_corners=False)
