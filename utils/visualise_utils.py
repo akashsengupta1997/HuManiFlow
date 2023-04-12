@@ -40,7 +40,7 @@ def render_point_est_visualisation(renderer,
                                   orthographic_scale=fixed_orthographic_scale,
                                   lights_rgb_settings=lights_rgb_settings,
                                   verts_features=vertex_colours)['rgb_images'].cpu().detach().numpy()[0]
-    body_vis_rgb_rot180 = renderer(vertices=pred_vertices_point_est_all_rot['190'],
+    body_vis_rgb_rot180 = renderer(vertices=pred_vertices_point_est_all_rot['180'],
                                    cam_t=fixed_cam_t,
                                    orthographic_scale=fixed_orthographic_scale,
                                    lights_rgb_settings=lights_rgb_settings,

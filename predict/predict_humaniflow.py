@@ -49,6 +49,10 @@ def predict_humaniflow(humaniflow_model,
                            'ambient_color': 0.5 * torch.ones(1, 3, device=device, dtype=torch.float32),
                            'diffuse_color': 0.3 * torch.ones(1, 3, device=device, dtype=torch.float32),
                            'specular_color': torch.zeros(1, 3, device=device, dtype=torch.float32)}
+    # Useful tensors that are re-used and can be pre-defined
+    x_axis = torch.tensor([1., 0., 0.], device=device)
+    y_axis = torch.tensor([0., 1., 0.], device=device)
+    zero_trans = torch.zeros(3, device=device)
     fixed_cam_t = torch.tensor([[0., -0.2, 2.5]], device=device)
     fixed_orthographic_scale = torch.tensor([[0.95, 0.95]], device=device)
 
@@ -124,33 +128,28 @@ def predict_humaniflow(humaniflow_model,
             pred_vertices_point_est = pred_smpl_output_point_est.vertices  # (1, 6890, 3)
             # Need to flip pred_vertices before projecting so that they project the right way up.
             pred_vertices_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_point_est,
-                                                                           axes=torch.tensor([1., 0., 0.], device=device),
+                                                                           axes=x_axis,
                                                                            angles=np.pi,
-                                                                           translations=torch.zeros(3, device=device))
+                                                                           translations=zero_trans)
             # Rotating 90° about vertical axis for visualisation
-            pred_vertices_rot90_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_point_est,
-                                                                                 axes=torch.tensor([0., 1., 0.], device=device),
-                                                                                 angles=-np.pi / 2.,
-                                                                                 translations=torch.zeros(3, device=device))
-            pred_vertices_rot180_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot90_point_est,
-                                                                                  axes=torch.tensor([0., 1., 0.], device=device),
-                                                                                  angles=-np.pi / 2.,
-                                                                                  translations=torch.zeros(3, device=device))
-            pred_vertices_rot270_point_est = aa_rotate_translate_points_pytorch3d(points=pred_vertices_rot180_point_est,
-                                                                                  axes=torch.tensor([0., 1., 0.], device=device),
-                                                                                  angles=-np.pi / 2.,
-                                                                                  translations=torch.zeros(3, device=device))
+            pred_vertices_point_est_all_rot = {'0': pred_vertices_point_est}
+            for rot in (90, 180, 270):
+                pred_vertices_point_est_all_rot[str(rot)] = aa_rotate_translate_points_pytorch3d(points=pred_vertices_point_est,
+                                                                                                 axes=y_axis,
+                                                                                                 angles=-np.deg2rad(rot),
+                                                                                                 translations=zero_trans)
 
             # Need to flip predicted T-pose vertices before projecting so that they project the right way up.
             pred_tpose_vertices_point_est = aa_rotate_translate_points_pytorch3d(points=smpl_model(betas=pred['shape_mode']).vertices,
-                                                                                 axes=torch.tensor([1., 0., 0.], device=device),
+                                                                                 axes=x_axis,
                                                                                  angles=np.pi,
-                                                                                 translations=torch.zeros(3, device=device))  # (1, 6890, 3)
+                                                                                 translations=zero_trans)  # (1, 6890, 3)
             # Rotating 90° about vertical axis for visualisation
-            pred_tpose_vertices_rot90_point_est = aa_rotate_translate_points_pytorch3d(points=pred_tpose_vertices_point_est,
-                                                                                       axes=torch.tensor([0., 1., 0.], device=device),
-                                                                                       angles=-np.pi / 2.,
-                                                                                       translations=torch.zeros(3, device=device))
+            pred_tpose_vertices_point_est_all_rot = {'0': pred_tpose_vertices_point_est,
+                                                     '90': aa_rotate_translate_points_pytorch3d(points=pred_tpose_vertices_point_est,
+                                                                                                axes=y_axis,
+                                                                                                angles=-np.pi / 2.,
+                                                                                                translations=zero_trans)}
 
             # Compute SMPL samples and process for visualisation
             if visualise_samples:
@@ -172,16 +171,19 @@ def predict_humaniflow(humaniflow_model,
 
                 # Need to flip predicted vertices samples before projecting so that they project the right way up.
                 pred_vertices_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
-                                                                             axes=torch.tensor([1., 0., 0.], device=device),
+                                                                             axes=x_axis,
                                                                              angles=np.pi,
-                                                                             translations=torch.zeros(3, device=device))
-
+                                                                             translations=zero_trans)
+                # Rotating 90° about vertical axis for visualisation
                 pred_vertices_rot90_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
-                                                                                   axes=torch.tensor([0., 1., 0.], device=device),
+                                                                                   axes=y_axis,
                                                                                    angles=-np.pi / 2.,
-                                                                                   translations=torch.zeros(3, device=device))
-                pred_vertices_samples = torch.cat([pred_vertices_point_est, pred_vertices_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
-                pred_vertices_rot90_samples = torch.cat([pred_vertices_rot90_point_est, pred_vertices_rot90_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
+                                                                                   translations=zero_trans)
+
+                pred_vertices_samples = torch.cat([pred_vertices_point_est_all_rot['0'], pred_vertices_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
+                pred_vertices_rot90_samples = torch.cat([pred_vertices_point_est_all_rot['90'], pred_vertices_rot90_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
+                pred_vertices_samples_all_rot = {'0': pred_vertices_samples,
+                                                 '90': pred_vertices_rot90_samples}
 
             # --------------------------------- RENDERING AND VISUALISATION ---------------------------------
             # Predicted camera corresponding to proxy rep input
@@ -206,12 +208,8 @@ def predict_humaniflow(humaniflow_model,
                                                                                   joints2D_confs=hrnet_output['joints2Dconfs'],
                                                                                   proxy_rep_input=proxy_rep_input,
                                                                                   cropped_for_proxy_rgb=cropped_for_proxy_rgb,
-                                                                                  pred_vertices_point_est_all_rot={'0': pred_vertices_point_est,
-                                                                                                                   '90': pred_vertices_rot90_point_est,
-                                                                                                                   '180': pred_vertices_rot180_point_est,
-                                                                                                                   '270': pred_vertices_rot270_point_est},
-                                                                                  pred_tpose_vertices_point_est_all_rot={'0': pred_tpose_vertices_point_est,
-                                                                                                                         '90': pred_tpose_vertices_rot90_point_est},
+                                                                                  pred_vertices_point_est_all_rot=pred_vertices_point_est_all_rot,
+                                                                                  pred_tpose_vertices_point_est_all_rot=pred_tpose_vertices_point_est_all_rot,
                                                                                   vertex_colours=vertex_uncertainty_colours,
                                                                                   cam_t=cam_t,
                                                                                   fixed_cam_t=fixed_cam_t,
@@ -243,8 +241,7 @@ def predict_humaniflow(humaniflow_model,
                                                            samples_cols=6,
                                                            visualise_wh=visualise_wh,
                                                            cropped_for_proxy_rgb=cropped_for_proxy_rgb,
-                                                           pred_vertices_samples_all_rot={'0': pred_vertices_samples,
-                                                                                          '90': pred_vertices_rot90_samples},
+                                                           pred_vertices_samples_all_rot=pred_vertices_samples_all_rot,
                                                            vertex_colours=vertex_uncertainty_colours,
                                                            cam_t=cam_t,
                                                            fixed_cam_t=fixed_cam_t,
