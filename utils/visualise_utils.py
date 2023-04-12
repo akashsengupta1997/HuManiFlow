@@ -148,7 +148,7 @@ def render_samples_visualisation(renderer,
                                  lights_rgb_settings):
 
     samples_fig = np.zeros((samples_rows * visualise_wh, samples_cols * visualise_wh, 3),
-                           dtype=torch.float32)
+                           dtype=np.float32)
     for i in range(num_vis_samples + 1):
         body_vis_output_sample = renderer(vertices=pred_vertices_samples_all_rot['0'][[i]],
                                           cam_t=cam_t,
