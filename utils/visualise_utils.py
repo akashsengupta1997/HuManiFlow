@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 
 from utils.image_utils import batch_add_rgb_background, batch_crop_opencv_affine
@@ -174,7 +174,7 @@ def render_samples_visualisation(renderer,
         col = (2 * i + 1) % samples_cols
         samples_fig[row * visualise_wh:(row + 1) * visualise_wh, col * visualise_wh:(col + 1) * visualise_wh] = body_vis_rgb_rot90_sample
 
-        return samples_fig
+    return samples_fig
 
 
 def plot_xyz_vertex_variance(pred_vertices_point_est,
