@@ -24,11 +24,11 @@ def run_predict(device,
                 humaniflow_cfg_path=None,
                 already_cropped_images=False,
                 joints2Dvisib_threshold=0.75,
-                num_pred_samples=50,
-                num_vis_samples=8,
-                visualise_samples=False,
                 visualise_uncropped=True,
                 visualise_xyz_variance=True,
+                visualise_samples=False,
+                num_pred_samples=50,
+                num_vis_samples=8,
                 gender='neutral'):
 
     # ------------------------- Models -------------------------
@@ -99,10 +99,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_dir', '-I', type=str, help='Path to directory of test images.')
     parser.add_argument('--save_dir', '-S', type=str, help='Path to directory where test outputs will be saved.')
-    parser.add_argument('--gpu', type=int, default=0)
 
-    parser.add_argument('--pose_shape_weights', '-W3D', type=str, default='./model_files/humaniflow_weights.tar')
-    parser.add_argument('--pose_shape_cfg', type=str, default=None)
+    parser.add_argument('--humaniflow_weights', '-W3D', type=str, default='./model_files/humaniflow_weights.tar')
+    parser.add_argument('--humaniflow_cfg', type=str, default=None)
     parser.add_argument('--pose2D_hrnet_weights', '-W2D', type=str, default='./model_files/pose_hrnet_w48_384x288.pth')
 
     parser.add_argument('--cropped_images', '-C', action='store_true', help='Images already cropped and centred.')
@@ -115,6 +114,8 @@ if __name__ == '__main__':
     parser.add_argument('--visualise_uncropped', '-VU', action='store_true')
     parser.add_argument('--visualise_xyz_variance', '-VXYZ', action='store_true')
 
+    parser.add_argument('--gpu', type=int, default=0)
+
     args = parser.parse_args()
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
@@ -125,16 +126,22 @@ if __name__ == '__main__':
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
+    if args.gender != 'neutral':
+        raise NotImplementedError
+
     run_predict(device=device,
                 image_dir=args.image_dir,
                 save_dir=args.save_dir,
-                humaniflow_weights_path=args.pose_shape_weights,
-                humaniflow_cfg_path=args.pose_shape_cfg,
+                humaniflow_weights_path=args.humaniflow_weights,
                 pose2D_hrnet_weights_path=args.pose2D_hrnet_weights,
+                humaniflow_cfg_path=args.humaniflow_cfg,
                 already_cropped_images=args.cropped_images,
-                visualise_samples=args.visualise_samples,
-                visualise_uncropped=args.visualise_uncropped,
                 joints2Dvisib_threshold=args.joints2Dvisib_threshold,
+                visualise_uncropped=args.visualise_uncropped,
+                visualise_xyz_variance=args.visualise_xyz_variance,
+                visualise_samples=args.visualise_samples,
+                num_pred_samples=args.num_pred_samples,
+                num_vis_samples=args.num_vis_samples,
                 gender=args.gender)
 
 

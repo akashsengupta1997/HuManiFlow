@@ -5,7 +5,7 @@ import numpy as np
 from itertools import product
 from torch.nn import functional as F
 try:
-    from pytorch3d.transforms.so3 import so3_log_map, so3_exponential_map
+    from pytorch3d.transforms.so3 import so3_log_map as so3_log_pytorch3d, so3_exp_map as so3_exp_pytorch3d
 except ImportError:
     print('Failed to import pytorch3d in rigid_transform_utils.py')
 
@@ -27,17 +27,17 @@ def aa_rotate_rotmats_pytorch3d(rotmats, axes, angles, rot_mult_order='post'):
     r = axes * angles
     if r.dim() < 2:
         r = r[None, :].expand(rotmats.shape[0], -1)
-    R = so3_exponential_map(log_rot=r)  # (B, 3, 3)
+    R = so3_exp_pytorch3d(log_rot=r)  # (B, 3, 3)
     if rot_mult_order == 'post':
         rotated_rotmats = torch.matmul(rotmats, R)
     elif rot_mult_order == 'pre':
         rotated_rotmats = torch.matmul(R, rotmats)
-    rotated_axisangle = so3_log_map(R=rotated_rotmats)
+    rotated_axisangle = so3_log_pytorch3d(R=rotated_rotmats)
 
     return rotated_axisangle, rotated_rotmats
 
 
-def aa_rotate_rotmats(axis, angle, rotmats, rot_mult_order='post'):
+def aa_rotate_rotmats_opencv(axis, angle, rotmats, rot_mult_order='post'):
     """
     This does the same thing as aa_rotate_rotmats_pytorch3d, except using openCV instead of pytorch3d.
     This is preferred when computing rotated rotation vectors (SO(3) log map) because pytorch3d's
@@ -76,7 +76,7 @@ def aa_rotate_translate_points_pytorch3d(points, axes, angles, translations):
     r = axes * angles
     if r.dim() < 2:
         r = r[None, :].expand(points.shape[0], -1)
-    R = so3_exponential_map(log_rot=r)  # (B, 3, 3)
+    R = so3_exp_pytorch3d(log_rot=r)  # (B, 3, 3)
     points = torch.einsum('bij,bkj->bki', R, points)
     points = points + translations
 
@@ -158,9 +158,9 @@ def so3_hat(v):
     e_z = v.new_tensor([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     v_hat = (
-        e_x * v[..., 0, None, None]
-        + e_y * v[..., 1, None, None]
-        + e_z * v[..., 2, None, None]
+            e_x * v[..., 0, None, None]
+            + e_y * v[..., 1, None, None]
+            + e_z * v[..., 2, None, None]
     )
     return v_hat
 
@@ -201,12 +201,15 @@ def so3_exp(v):
     return eye + alpha[..., None, None] * x + beta[..., None, None] * x @ x
 
 
-def so3_log(r):
+def so3_log(r,
+            return_axis_angle=False):
     """
     Code from https://github.com/pimdh/relie.
     Logarithm map of SO(3).
     :param r: group element of shape (..., 3, 3)
+    :param return_axis_angle: bool, convert skew-symetric matrix output to 3D vector if True
     :return: Algebra element in matrix basis of shape (..., 3, 3)
+             Converted to 3D vector if return_axis_angle is True.
 
     Uses https://en.wikipedia.org/wiki/Rotation_group_SO(3)#Logarithm_map
     """
@@ -227,6 +230,9 @@ def so3_log(r):
     mask = ((math.pi - theta[..., 0, 0]).abs() < 1e-2).nonzero()
     if mask.numel():
         log[mask[:, 0]] = so3_log_pi(r[mask[:, 0]], theta[mask[:, 0]])
+
+    if return_axis_angle:
+        log = so3_vee(log)
 
     return log
 
@@ -306,3 +312,63 @@ def so3_log_abs_det_jacobian(x):
         mask, (2 - 2 * torch.cos(x_norm)) / x_norm ** 2, 1 - x_norm ** 2 / 12
     )
     return torch.log(ratio).to(x.dtype)
+
+
+def so3_exp_opencv(rotvecs):
+    """
+    Simple for loop over a batch of axis-angle vectors, converting each to
+    rotation matrix using OpenCV.
+    :param rotvecs: (B, 3) batch of axis-angle rotation vectors
+    :return R: (B, 3, 3) batch of rotation matrices
+    """
+    B = rotvecs.shape[0]
+    R = np.zeros((B, 3, 3))
+    for i in range(B):
+        R[i] = cv2.Rodrigues(rotvecs[i])[0]
+    return R
+
+
+def so3_log_opencv(R):
+    """
+    Simple for loop over a batch of rotation matrices, converting each to
+    axis-angle representation using OpenCV.
+    :param R: (B, 3, 3) batch of rotation matrices
+    :return rotvecs: (B, 3) batch of axis-angle rotation vectors
+    """
+    B = R.shape[0]
+    rotvecs = np.zeros((B, 3))
+    for i in range(B):
+        rotvecs[i] = np.squeeze(cv2.Rodrigues(R[i])[0])
+    return rotvecs
+
+
+# # Code snippet showing that pytorch3d so3_log_map is broken near 180° rotations.
+# # Random target R to recover
+# rot_angle = np.deg2rad(180)
+# rot_axis = np.random.randn(3)
+# rot_axis = rot_axis/np.linalg.norm(rot_axis)
+# rotvec = rot_angle * rot_axis
+# R1 = cv2.Rodrigues(rotvec)[0]
+# # Fixed target R to recover, right rotvec should be [0, pi, 0]
+# R2 = np.array([[-1.,  0.,  0.],
+#                [ 0.,  1.,  0.],
+#                [ 0., 0.,  -1.]])
+# R = np.stack([R1, R2])
+#
+# # Convert to axis-angle vector
+# print('TARGET R\n', R)
+# rotcv2 = so3_log_opencv(R)
+# rotp3d = so3_log_pytorch3d(torch.from_numpy(R))
+# rotrelie = so3_log(torch.from_numpy(R).double(),
+#                    return_axis_angle=True)
+#
+# # Convert back to rotation matrix - compare with target R
+# Rcv2 = so3_exp_opencv(rotcv2)
+# Rp3d = so3_exp_pytorch3d(rotp3d)
+# Rrelie = so3_exp(rotrelie)
+# print('\nOPENCV')
+# print(Rcv2)
+# print('\nPYTORCH3D')
+# print(Rp3d)
+# print('\nRELIE')
+# print(Rrelie)

@@ -38,7 +38,7 @@ def predict_humaniflow(humaniflow_model,
                        visualise_samples=False,
                        visualise_xyz_variance=True):
 
-    # Setting up body visualisation renderer
+    # Setting up RGB renderer for visualisation
     body_vis_renderer = TexturedIUVRenderer(device=device,
                                             batch_size=1,
                                             img_wh=visualise_wh,
@@ -115,10 +115,11 @@ def predict_humaniflow(humaniflow_model,
             # - Pose/shape point estimate from predicted distribution
 
             # Save predicted outputs (useful for post-processing optimisation)
-            save_pred_output(hrnet_output=hrnet_output,
-                             cropped_for_proxy=cropped_for_proxy,
-                             humaniflow_output=pred,
-                             save_path=os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_pred.npz'))
+            save_pred_output(hrnet_output,
+                             cropped_for_proxy,
+                             proxy_rep_input,
+                             pred,
+                             os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_pred.npz'))
 
             # Compute SMPL point estimates and process for visualisation
             pred_smpl_output_point_est = smpl_model(body_pose=pred['pose_rotmats_point_est'],
@@ -152,7 +153,7 @@ def predict_humaniflow(humaniflow_model,
                                                                                                 translations=zero_trans)}
 
             # Compute SMPL samples and process for visualisation
-            if visualise_samples:
+            if visualise_samples or visualise_xyz_variance:
                 pred_smpl_output_samples = smpl_model(body_pose=pred['pose_rotmats_samples'][0, :, :, :, :],  # (num_pred_samples, 23, 3, 3)
                                                       global_orient=pred['glob_rotmat'][:, None, :, :].expand(num_pred_samples, -1, -1, -1),  # (num_pred_samples, 1, 3, 3)
                                                       betas=pred['shape_samples'][0, :, :],  # (num_pred_samples, num_betas)
@@ -163,27 +164,34 @@ def predict_humaniflow(humaniflow_model,
                 # Estimate per-vertex uncertainty - i.e. directional variance and average Euclidean distance from mean - by sampling
                 # SMPL poses/shapes and computing corresponding vertex meshes
                 per_vertex_avg_dist_from_mean, per_vertex_xyz_variance = compute_vertex_variance_from_samples(pred_vertices_samples)
+                # Generate per-vertex uncertainty colourmap
+                vertex_uncertainty_norm = plt.Normalize(vmin=0.0, vmax=0.2, clip=True)
+                vertex_uncertainty_colours = plt.cm.jet(vertex_uncertainty_norm(per_vertex_avg_dist_from_mean.cpu().detach().numpy()))[:, :3]
+                vertex_uncertainty_colours = torch.from_numpy(vertex_uncertainty_colours[None, :, :]).to(device).float()
 
-                pred_vertices_samples = joints2D_error_sorted_verts_sampling(pred_vertices_samples=pred_vertices_samples,
-                                                                             pred_joints_samples=pred_joints_samples,
-                                                                             input_joints2D_heatmaps=proxy_rep_input[:, 1:, :, :],
-                                                                             pred_cam_wp=pred['cam_wp'])[:num_vis_samples, :, :]  # (num_vis_samples, 6890, 3)
+                if visualise_samples:
+                    pred_vertices_samples = joints2D_error_sorted_verts_sampling(pred_vertices_samples=pred_vertices_samples,
+                                                                                 pred_joints_samples=pred_joints_samples,
+                                                                                 input_joints2D_heatmaps=proxy_rep_input[:, 1:, :, :],
+                                                                                 pred_cam_wp=pred['cam_wp'])[:num_vis_samples, :, :]  # (num_vis_samples, 6890, 3)
 
-                # Need to flip predicted vertices samples before projecting so that they project the right way up.
-                pred_vertices_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
-                                                                             axes=x_axis,
-                                                                             angles=np.pi,
-                                                                             translations=zero_trans)
-                # Rotating 90° about vertical axis for visualisation
-                pred_vertices_rot90_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
-                                                                                   axes=y_axis,
-                                                                                   angles=-np.pi / 2.,
-                                                                                   translations=zero_trans)
+                    # Need to flip predicted vertices samples before projecting so that they project the right way up.
+                    pred_vertices_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
+                                                                                 axes=x_axis,
+                                                                                 angles=np.pi,
+                                                                                 translations=zero_trans)
+                    # Rotating 90° about vertical axis for visualisation
+                    pred_vertices_rot90_samples = aa_rotate_translate_points_pytorch3d(points=pred_vertices_samples,
+                                                                                       axes=y_axis,
+                                                                                       angles=-np.pi / 2.,
+                                                                                       translations=zero_trans)
 
-                pred_vertices_samples = torch.cat([pred_vertices_point_est_all_rot['0'], pred_vertices_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
-                pred_vertices_rot90_samples = torch.cat([pred_vertices_point_est_all_rot['90'], pred_vertices_rot90_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
-                pred_vertices_samples_all_rot = {'0': pred_vertices_samples,
-                                                 '90': pred_vertices_rot90_samples}
+                    pred_vertices_samples = torch.cat([pred_vertices_point_est_all_rot['0'], pred_vertices_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
+                    pred_vertices_rot90_samples = torch.cat([pred_vertices_point_est_all_rot['90'], pred_vertices_rot90_samples], dim=0)  # (num_vis_samples + 1, 6890, 3)
+                    pred_vertices_samples_all_rot = {'0': pred_vertices_samples,
+                                                     '90': pred_vertices_rot90_samples}
+            else:
+                vertex_uncertainty_colours = None
 
             # --------------------------------- RENDERING AND VISUALISATION ---------------------------------
             # Predicted camera corresponding to proxy rep input
@@ -192,22 +200,21 @@ def predict_humaniflow(humaniflow_model,
                                torch.ones(pred['cam_wp'].shape[0], 1, device=device).float() * 2.5],
                               dim=-1)
 
-            cropped_for_proxy_rgb = torch.nn.functional.interpolate(cropped_for_proxy['rgb'],
+            cropped_rgb_for_vis = torch.nn.functional.interpolate(cropped_for_proxy['rgb'],
+                                                                  size=(visualise_wh, visualise_wh),
+                                                                  mode='bilinear',
+                                                                  align_corners=False)
+            cropped_proxy_for_vis = torch.nn.functional.interpolate(proxy_rep_input.sum(dim=1, keepdim=True),
                                                                     size=(visualise_wh, visualise_wh),
                                                                     mode='bilinear',
-                                                                    align_corners=False)
-
-            # Generate per-vertex uncertainty colourmap
-            vertex_uncertainty_norm = plt.Normalize(vmin=0.0, vmax=0.2, clip=True)
-            vertex_uncertainty_colours = plt.cm.jet(vertex_uncertainty_norm(per_vertex_avg_dist_from_mean.cpu().detach().numpy()))[:, :3]
-            vertex_uncertainty_colours = torch.from_numpy(vertex_uncertainty_colours[None, :, :]).to(device).float()
+                                                                    align_corners=False).expand(-1, 3, -1, -1)  # single-channel to RGB
 
             # Render and save point estimate visualisation
             point_est_fig, point_est_mesh_render = render_point_est_visualisation(renderer=body_vis_renderer,
                                                                                   joints2D=cropped_for_proxy['joints2D'],
-                                                                                  joints2D_confs=hrnet_output['joints2Dconfs'],
-                                                                                  proxy_rep_input=proxy_rep_input,
-                                                                                  cropped_for_proxy_rgb=cropped_for_proxy_rgb,
+                                                                                  joints2D_confs=hrnet_output['joints2Dconfs'][None],
+                                                                                  cropped_proxy_for_vis=cropped_proxy_for_vis,
+                                                                                  cropped_rgb_for_vis=cropped_rgb_for_vis,
                                                                                   pred_vertices_point_est_all_rot=pred_vertices_point_est_all_rot,
                                                                                   pred_tpose_vertices_point_est_all_rot=pred_tpose_vertices_point_est_all_rot,
                                                                                   vertex_colours=vertex_uncertainty_colours,
@@ -216,7 +223,9 @@ def predict_humaniflow(humaniflow_model,
                                                                                   orthographic_scale=orthographic_scale,
                                                                                   fixed_orthographic_scale=fixed_orthographic_scale,
                                                                                   lights_rgb_settings=lights_rgb_settings,
-                                                                                  visualise_wh=visualise_wh)
+                                                                                  visualise_wh=visualise_wh,
+                                                                                  proxy_orig_wh=humaniflow_cfg.DATA.PROXY_REP_SIZE)
+            point_est_fig = point_est_fig[0]
             cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_point_est.png'),
                         point_est_fig[:, :, ::-1] * 255)
 
@@ -227,11 +236,11 @@ def predict_humaniflow(humaniflow_model,
                     cropped_mesh_render_iuv=point_est_mesh_render['iuv_images'].permute(0, 3, 1, 2).contiguous().cpu().detach().numpy(),
                     bbox_centres=hrnet_output['bbox_centre'][None].cpu().detach().numpy(),
                     bbox_whs=torch.max(hrnet_output['bbox_height'], hrnet_output['bbox_width'])[None].cpu().detach().numpy(),
-                    orig_image=orig_image,
+                    orig_image=orig_image[None],
                     visualise_wh=visualise_wh,
                     bbox_scale_factor=humaniflow_cfg.DATA.BBOX_SCALE_FACTOR)
                 cv2.imwrite(os.path.join(save_dir, os.path.splitext(image_fname)[0] + '_point_est_uncrop.png'),
-                            uncropped_point_est_fig[:, :, ::-1])
+                            uncropped_point_est_fig[0, :, :, ::-1])
 
             if visualise_samples:
                 # Render and save samples visualisations
@@ -240,7 +249,7 @@ def predict_humaniflow(humaniflow_model,
                                                            samples_rows=3,
                                                            samples_cols=6,
                                                            visualise_wh=visualise_wh,
-                                                           cropped_for_proxy_rgb=cropped_for_proxy_rgb,
+                                                           cropped_rgb_for_vis=cropped_rgb_for_vis,
                                                            pred_vertices_samples_all_rot=pred_vertices_samples_all_rot,
                                                            vertex_colours=vertex_uncertainty_colours,
                                                            cam_t=cam_t,
@@ -255,7 +264,7 @@ def predict_humaniflow(humaniflow_model,
                 # Plot per-vertex directional (i.e. x/y/z-axis) variance (represents uncertainty)
                 plot_xyz_vertex_variance(pred_vertices_point_est=pred_vertices_point_est,
                                          per_vertex_xyz_variance=per_vertex_xyz_variance.cpu().detach().numpy(),
-                                         cropped_for_proxy_rgb=cropped_for_proxy_rgb.cpu().detach().numpy()[0].transpose(1, 2, 0),
+                                         cropped_rgb_for_vis=cropped_rgb_for_vis.cpu().detach().numpy()[0].transpose(1, 2, 0),
                                          visualise_wh=visualise_wh,
                                          cam_wp=pred['cam_wp'],
                                          save_path=os.path.join(save_dir, os.path.splitext(image_fname)[0] + 'xyz_variance.png'))
