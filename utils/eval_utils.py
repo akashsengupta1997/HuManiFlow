@@ -59,12 +59,49 @@ def compute_similarity_transform(S1, S2):
     return S1_hat
 
 
-def procrustes_analysis_batch(S1, S2):
-    """Batched version of compute_similarity_transform."""
-    S1_hat = np.zeros_like(S1)
-    for i in range(S1.shape[0]):
-        S1_hat[i] = compute_similarity_transform(S1[i], S2[i])
-    return S1_hat
+def procrustes_analysis_batch(S1,
+                              S2,
+                              return_R=False):
+    batch_size = S1.shape[0]
+    S1 = S1.transpose(0, 2, 1)
+    S2 = S2.transpose(0, 2, 1)
+    # 1. Remove mean.
+    mu1 = S1.mean(axis=2, keepdims=True)
+    mu2 = S2.mean(axis=2, keepdims=True)
+    X1 = S1 - mu1
+    X2 = S2 - mu2
+
+    # 2. Compute variance of X1 used for scale.
+    var1 = (X1**2).sum(axis=(1, 2))
+
+    # 3. The outer product of X1 and X2.
+    K = np.matmul(X1, X2.transpose(0, 2, 1))
+
+    # 4. Solution that Maximizes trace(R'K) is R=U*V', where U, V are singular vectors of K.
+    U, s, Vh = np.linalg.svd(K)
+    V = Vh.transpose(0, 2, 1)
+
+    # Construct Z that fixes the orientation of R to get det(R)=1.
+    Z = np.tile(np.eye(U.shape[1])[None, :, :], (batch_size, 1, 1))
+    Z[:, -1, -1] *= np.sign(np.linalg.det(np.matmul(U, Vh)))
+
+    # Construct R.
+    R = np.matmul(np.matmul(V, Z), U.transpose(0, 2, 1))
+
+    # 5. Recover scale.
+    trace = np.matmul(R, K).diagonal(offset=0, axis1=-1, axis2=-2).sum(axis=-1)
+    scale = (trace / var1)[..., None, None]
+
+    # 6. Recover translation.
+    t = mu2 - scale * np.matmul(R, mu1)
+
+    # 7. Error:
+    S1_hat = scale * np.matmul(R, S1) + t
+
+    if return_R:
+        return S1_hat.transpose(0, 2, 1), R
+    else:
+        return S1_hat.transpose(0, 2, 1)
 
 
 def scale_and_translation_transform_batch(P, T):
@@ -72,18 +109,17 @@ def scale_and_translation_transform_batch(P, T):
     First Normalises batch of input 3D meshes P such that each mesh has mean (0, 0, 0) and
     RMS distance from mean = 1.
     Then transforms P such that it has the same mean and RMSD as T.
-    :param P: (batch_size, N, 3) batch of N 3D meshes to transform.
-    :param T: (batch_size, N, 3) batch of N reference 3D meshes.
+    :param P: (batch_size, N, 3) batch of 3D meshes to transform.
+    :param T: (batch_size, N, 3) batch of reference 3D meshes.
     :return: P transformed
     """
-    P_mean = np.mean(P, axis=1, keepdims=True)
+    P_mean = np.mean(P, axis=-2, keepdims=True)
     P_trans = P - P_mean
-    P_scale = np.sqrt(np.sum(P_trans ** 2, axis=(1, 2), keepdims=True) / P.shape[1])
+    P_scale = np.sqrt(np.sum(P_trans ** 2, axis=(-2, -1), keepdims=True) / P.shape[-2])
     P_normalised = P_trans / P_scale
 
-    T_mean = np.mean(T, axis=1, keepdims=True)
-    T_scale = np.sqrt(np.sum((T - T_mean) ** 2, axis=(1, 2), keepdims=True) / T.shape[1])
-
+    T_mean = np.mean(T, axis=-2, keepdims=True)
+    T_scale = np.sqrt(np.sum((T - T_mean) ** 2, axis=(-2, -1), keepdims=True) / T.shape[-2])
     P_transformed = P_normalised * T_scale + T_mean
 
     return P_transformed
@@ -94,8 +130,8 @@ def scale_and_translation_transform_batch_torch(P, T):
     First Normalises batch of input 3D meshes P such that each mesh has mean (0, 0, 0) and
     RMS distance from mean = 1.
     Then transforms P such that it has the same mean and RMSD as T.
-    :param P: (batch_size, N, 3) batch of N 3D meshes to transform.
-    :param T: (batch_size, N, 3) batch of N reference 3D meshes.
+    :param P: (batch_size, N, 3) batch of 3D meshes to transform.
+    :param T: (batch_size, N, 3) batch of reference 3D meshes.
     :return: P transformed
     """
     P_mean = torch.mean(P, dim=1, keepdim=True)

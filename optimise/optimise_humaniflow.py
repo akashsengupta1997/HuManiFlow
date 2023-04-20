@@ -66,6 +66,9 @@ def optimise_batch_with_humaniflow_prior(humaniflow_model,
     fixed_orthographic_scale = torch.tensor([[0.95, 0.95]], device=device).expand(batch_size, -1)
 
     # ------------------------------- OPTIMISATION -------------------------------
+    humaniflow_model.eval()
+    humaniflow_model.pose_so3flow_transform_modules.eval()
+
     for iter_num in tqdm(range(optimise_cfg.NUM_ITERS)):
         opt_smpl = smpl_model(body_pose=pose_axis_angle,
                               global_orient=glob_axis_angle,

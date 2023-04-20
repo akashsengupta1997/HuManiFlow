@@ -89,6 +89,6 @@ class SSP3DEvalDataset(Dataset):
                 'shape': shape,
                 'pose': pose,
                 'silhouette': silhouette,
-                'keypoints': keypoints,
+                'joints2D': keypoints,
                 'fname': fname,
                 'gender': gender}

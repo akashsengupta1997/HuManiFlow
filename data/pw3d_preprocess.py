@@ -8,6 +8,8 @@ import argparse
 
 from configs import paths
 from utils.cam_utils import perspective_project_torch
+from utils.image_utils import batch_crop_opencv_affine
+from utils.label_conversions import PW3D_JOINTS2D_TO_COCO_MAP
 from models.smpl import SMPL
 
 
@@ -105,9 +107,8 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
     smpl_male = SMPL(paths.SMPL, batch_size=1, gender='male').to(device)
     smpl_female = SMPL(paths.SMPL, batch_size=1, gender='female').to(device)
 
-    # imgnames_, scales_, centers_, parts_ = [], [], [], []
     cropped_frame_fnames_, whs_, centers_, = [], [], []
-    poses_, shapes_, genders_ = [], [], []
+    poses_, shapes_, genders_, cropped_joints2D_ = [], [], [], []
 
     sequence_files = sorted([os.path.join(dataset_path, 'sequenceFiles', 'test', f)
                              for f in os.listdir(os.path.join(dataset_path, 'sequenceFiles', 'test'))
@@ -192,6 +193,16 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
                                                        cropped_image_fname)
                     cv2.imwrite(cropped_image_fpath, cropped_image)
 
+                    # Crop GT 2D joint labels to match cropped frame
+                    joints2D_coco = np.transpose(poses2d[person_num][frame_num])[PW3D_JOINTS2D_TO_COCO_MAP, :]  # (17, 3)
+                    cropped_joints2D_coco = batch_crop_opencv_affine(output_wh=(crop_wh, crop_wh),
+                                                                     num_to_crop=1,
+                                                                     joints2D=joints2D_coco[None, :, :2],
+                                                                     bbox_centres=np.array([[center[1], center[0]]]),
+                                                                     bbox_whs=np.array([wh]),
+                                                                     orig_scale_factor=bbox_scale_factor)['joints2D'][0]
+                    cropped_joints2D_coco = np.concatenate([cropped_joints2D_coco, joints2D_coco[:, [2]]], axis=-1)
+
                     # Transform global using cam extrinsics pose before storing
                     pose = pose[0].cpu().detach().numpy()
                     cam_R = cam_R[0].cpu().detach().numpy()
@@ -204,15 +215,17 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
                     poses_.append(pose)
                     shapes_.append(shape)
                     genders_.append(gender)
-                    # print(cropped_image_fname, shape.shape, pose.shape, center, wh, gender)
+                    cropped_joints2D_.append(cropped_joints2D_coco)
 
     # Store all data in npz file.
     out_file = os.path.join(out_path, '3dpw_test.npz')
-    np.savez(out_file, imgname=cropped_frame_fnames_,
+    np.savez(out_file,
+             imgname=cropped_frame_fnames_,
              center=centers_,
              wh=whs_,
              pose=poses_,
              shape=shapes_,
+             joints2D_coco=cropped_joints2D_,
              gender=genders_)
 
 

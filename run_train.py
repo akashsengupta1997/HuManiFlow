@@ -21,7 +21,7 @@ from train.train_humaniflow import train_humaniflow
 
 def run_train(device,
               experiment_dir,
-              pose_shape_cfg_opts=None,
+              humaniflow_cfg_opts=None,
               resume_from_epoch=None):
 
     humaniflow_cfg = get_humaniflow_cfg_defaults()
@@ -38,8 +38,8 @@ def run_train(device,
             os.makedirs(model_save_dir)
         else:
             print('\nWARNING: {} already exists - may be overwriting previous experiments!'.format(experiment_dir))
-        if pose_shape_cfg_opts is not None:
-            humaniflow_cfg.merge_from_list(pose_shape_cfg_opts)
+        if humaniflow_cfg_opts is not None:
+            humaniflow_cfg.merge_from_list(humaniflow_cfg_opts)
         with open(config_save_path, 'w') as f:
             f.write(humaniflow_cfg.dump())
         checkpoint = None
@@ -143,5 +143,5 @@ if __name__ == '__main__':
 
     run_train(device=device,
               experiment_dir=args.experiment_dir,
-              pose_shape_cfg_opts=args.humaniflow_cfg_opts,
+              humaniflow_cfg_opts=args.humaniflow_cfg_opts,
               resume_from_epoch=args.resume_from_epoch)

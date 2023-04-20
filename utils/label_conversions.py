@@ -18,6 +18,7 @@ ALL_JOINTS_TO_COCO_MAP = [24, 26, 25, 28, 27, 16, 17, 18, 19, 20, 21, 1, 2, 4, 5
 ALL_JOINTS_TO_H36M_MAP = list(range(73, 90))
 H36M_TO_J17 = [6, 5, 4, 1, 2, 3, 16, 15, 14, 11, 12, 13, 8, 10, 0, 7, 9]
 H36M_TO_J14 = H36M_TO_J17[:14]
+PW3D_JOINTS2D_TO_COCO_MAP = [0, 15, 14, 17, 16, 5, 2, 6, 3, 7, 4, 11, 8, 12, 9, 13, 10]
 
 # Joint label and body part seg label matching
 # 24 part seg: COCO Joints
