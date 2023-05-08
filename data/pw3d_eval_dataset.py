@@ -25,7 +25,7 @@ class PW3DEvalDataset(Dataset):
             self.keypoints = np.load(os.path.join(pw3d_dir_path,  f'extreme_cropped_{extreme_crop_scale}_hrnet_results_centred.npy'))
 
         # Ground Truth Targets
-        data = np.load(os.path.join(pw3d_dir_path, '3dpw_test2.npz'))  # TODO change back to 3dpw_test
+        data = np.load(os.path.join(pw3d_dir_path, '3dpw_test.npz'))
         self.frame_fnames = data['imgname']
         self.pose = data['pose']
         self.shape = data['shape']

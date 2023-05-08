@@ -1,11 +1,14 @@
 # HuManiFlow: Ancestor-Conditioned Normalising Flows on SO(3) Manifolds for Human Pose and Shape Distribution Estimation
 Akash Sengupta, Ignas Budvytis, Roberto Cipolla  
 CVPR 2023  
-[[paper+supplementary]()][[poster]()][[results video]()]
+[[paper+supplementary]()]
+
+[//]: # ([[poster]&#40;&#41;][[results video]&#40;&#41;])
 
 This is the official code repository of the above paper, which takes a probabilistic approach to 3D human shape and pose estimation and aims to improve sample-input consistency and sample diversity over contemporary methods.
 
 ![teaser](assets/teaser.gif)
+![method_fig](assets/method_fig.png)
 
 This repository contains inference, training and evaluation code. A few weaknesses of this approach, and future research directions, are listed below.
 If you find this code useful in your research, please cite the following publication:
@@ -48,28 +51,26 @@ Download pre-trained model checkpoints for our 3D Shape/Pose network, as well as
 
 Place the SMPL model files and network checkpoints in the `model_files` directory, which should have the following structure. If the files are placed elsewhere, you will need to update `configs/paths.py` accordingly.
 
-    HierarchicalProbabilistic3DHuman
-    ├── model_files                                  # Folder with model files
+    HuManiFlow
+    ├── model_files                           # Folder with model files
     │   ├── smpl
-    │   │   ├── SMPL_NEUTRAL.pkl                     # Gender-neutral SMPL model
-    │   │   ├── SMPL_MALE.pkl                        # Male SMPL model
-    │   │   ├── SMPL_FEMALE.pkl                      # Female SMPL model
-    │   ├── poseMF_shapeGaussian_net_weights.tar     # Pose/Shape distribution predictor checkpoint
-    │   ├── pose_hrnet_w48_384x288.pth               # Pose2D HRNet checkpoint
-    │   ├── cocoplus_regressor.npy                   # Cocoplus joints regressor
-    │   ├── J_regressor_h36m.npy                     # Human3.6M joints regressor
-    │   ├── J_regressor_extra.npy                    # Extra joints regressor
-    │   └── UV_Processed.mat                         # DensePose UV coordinates for SMPL mesh             
+    │   │   ├── SMPL_NEUTRAL.pkl              # Gender-neutral SMPL model
+    │   │   ├── SMPL_MALE.pkl                 # Male SMPL model
+    │   │   ├── SMPL_FEMALE.pkl               # Female SMPL model
+    │   ├── humaniflow_weights.tar            # HuManiFlow checkpoint
+    │   ├── pose_hrnet_w48_384x288.pth        # Pose2D HRNet checkpoint
+    │   ├── cocoplus_regressor.npy            # Cocoplus joints regressor
+    │   ├── J_regressor_h36m.npy              # Human3.6M joints regressor
+    │   ├── J_regressor_extra.npy             # Extra joints regressor
+    │   └── UV_Processed.mat                  # DensePose UV coordinates for SMPL mesh
     └── ...
  
 ## Inference
 `run_predict.py` is used to run inference on a given folder of input images. For example, to run inference on the demo folder, do:
 ```
-python run_predict.py --image_dir ./demo/ --save_dir ./output/ --visualise_samples --visualise_uncropped
+python run_predict.py --image_dir ./demo/ --save_dir ./pred_output/ -VS -VU -VXYZ
 ```
 This will first detect human bounding boxes in the input images using Mask-RCNN. If your input images are already cropped and centred around the subject of interest, you may skip this step using `--cropped_images` as an option. The 3D Shape/Pose network is somewhat sensitive to cropping and centering - this is a good place to start troubleshooting in case of poor results.
-
-Inference can be slow due to the rejection sampling procedure used to estimate per-vertex 3D uncertainty. If you are not interested in per-vertex uncertainty, you may modify `predict/predict_poseMF_shapeGaussian_net.py` by commenting out code related to sampling, and use a plain texture to render meshes for visualisation (this will be cleaned up and added as an option to in the `run_predict.py` future).
 
 ## Evaluation
 TODO
@@ -100,8 +101,6 @@ As a sanity check, the script should find 91106 training poses, 125 + 792 traini
 ## Weaknesses and Future Research
 The following aspects of our method may be the subject of future research:
 - Mesh interpenetrations: this occurs occasionally amongst 3D mesh samples drawn from shape and pose distribution predictions. A sample inter-penetratation penalty may be useful.
-- Sample diversity / distribution expressiviness: since the predicted distributions are uni-modal, sample diversity may be limited.
-- Sampling speed: rejection sampling from a matrix-Fisher distribution is currently slow.
 - Non-tight clothing: body shape prediction accuracy suffers when subjects are wearing non-tight clothing, since the synthetic training data does not model clothing in 3D (only uses clothing textures). Perhaps better synthetic data (e.g. [AGORA](https://agora.is.tue.mpg.de)) will alleviate this issue.
 
 ## TODO
@@ -110,14 +109,11 @@ The following aspects of our method may be the subject of future research:
 ## Acknowledgments
 Code was adapted from/influenced by the following repos - thanks to the authors!
 
-- [HMR](https://github.com/akanazawa/hmr)
+- [ReLie](https://github.com/pimdh/relie)
+- [Pyro](https://github.com/pyro-ppl/pyro)
+- [HRNet](https://github.com/leoxiaobin/deep-high-resolution-net.pytorch)
 - [SPIN](https://github.com/nkolot/SPIN)
 - [VIBE](https://github.com/mkocabas/VIBE)
-- [HRNet](https://github.com/leoxiaobin/deep-high-resolution-net.pytorch)
 - [PyTorch3D](https://github.com/facebookresearch/pytorch3d)
-- [Probabilistic Orientation Estimation with Matrix Fisher Distributions](https://github.com/Davmo049/Public_prob_orientation_estimation_with_matrix_fisher_distributions)
 - [CannyEdgePytorch](https://github.com/DCurro/CannyEdgePytorch)
-- [Matrix-Fisher-Distribution](https://github.com/tylee-fdcl/Matrix-Fisher-Distribution)
-- [SURREAL](https://github.com/gulvarol/surreal)
-- [MultiGarmnetNet](https://github.com/bharat-b7/MultiGarmentNetwork)
-- [LSUN](https://github.com/fyu/lsun)
+
