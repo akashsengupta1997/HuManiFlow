@@ -5,7 +5,7 @@ CVPR 2023
 
 This is the official code repository of the above paper, which takes a probabilistic approach to 3D human shape and pose estimation and aims to improve sample-input consistency and sample diversity over contemporary methods.
 
-![teaser](teaser.gif)
+![teaser](assets/teaser.gif)
 
 This repository contains inference, training and evaluation code. A few weaknesses of this approach, and future research directions, are listed below.
 If you find this code useful in your research, please cite the following publication:

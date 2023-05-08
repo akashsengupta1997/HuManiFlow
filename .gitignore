@@ -134,3 +134,11 @@ dmypy.json
 
 # Experiment logs
 ./experiments/
+
+# PyCharm files
+*.iml
+*.xml
+.idea/*
+
+# OSX
+.DS_Store
