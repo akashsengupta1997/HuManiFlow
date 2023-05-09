@@ -27,10 +27,10 @@ class EvalMetricsTracker:
         - Sample-Input Consistency
             - Joints2D Samples L2E:
                 - Mean per joint 2D position error over N samples obtained from shape/pose distribution.
-                - All 2D samples from predicted 3D distribution should match 2D target joints.
+                    - All 2D samples from predicted 3D distribution should match 2D target joints.
             - Silhouette samples IOU
                 - Mean silhouette-IOU over N samples obtained from shape/pose distribution.
-                - All 2D samples from predicted 3D distribution should match 2D target silhouette.
+                    - All 2D samples from predicted 3D distribution should match 2D target silhouette.
         - Sample Diversity
             - Visible / Invisible Joints3D Diversity:
                 - Average Euclidean distance from mean of COCO 3D Joints over N samples.

@@ -86,10 +86,8 @@ def run_evaluate(device,
     elif dataset_name == 'ssp3d':
         # 3D point estimate metrics
         metrics = ['PVE-SC', 'PVE-PA', 'PVE-T-SC']
-        # Distribution accuracy - 3D point estimate metrics with minimum sample
-        # metrics += [metric + '_samples_min' for metric in metrics]
         # Sample-input consistency - 2D sample (and point estimate) reprojection error
-        metrics += ['silhouette-IOU', 'joints2D-L2E']
+        metrics += ['joints2D-L2E', 'silhouette-IOU']
         metrics += ['joints2Dsamples-L2E', 'silhouettesamples-IOU']
         # Sample diversity - 3D sample average distance from mean
         metrics += ['verts3D_sample_diversity', 'joints3D_sample_diversity',

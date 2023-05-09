@@ -1,7 +1,7 @@
 # ------------------- SMPL Files -------------------
 SMPL = './model_files/smpl'
 J_REGRESSOR_EXTRA = './model_files/J_regressor_extra.npy'
-COCOPLUS_REGRESSOR= './model_files/cocoplus_regressor.npy'
+COCOPLUS_REGRESSOR = './model_files/cocoplus_regressor.npy'
 H36M_REGRESSOR = './model_files/J_regressor_h36m.npy'
 
 # ------------------- DensePose Files for Textured Rendering -------------------
