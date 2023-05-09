@@ -35,7 +35,7 @@ git clone https://github.com/akashsengupta1997/HuManiFlow.git
 ```
 We recommend using a virtual environment to install relevant dependencies:
 ```
-python3 -m venv HuManiFlow_env
+python3.8 -m venv HuManiFlow_env
 source HuManiFlow_env/bin/activate
 ```
 Install torch and torchvision (the code has been tested with v1.9.0 of torch), as well as other dependencies: 
@@ -54,7 +54,7 @@ pip install "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.1"
 ### Model files
 You will need to download SMPL model files from [here](https://smpl.is.tue.mpg.de/). The neutral model is required for training and running the demo code. 
 If you want to evaluate the model on datasets with gendered SMPL labels (such as 3DPW and SSP-3D), you should also download the male and female models. 
-You may need to convert the SMPL model files to be compatible with python3 by removing 
+You may need to convert the SMPL model files to be compatible with Python 3 by removing 
 any chumpy objects. To do so, please follow the instructions [here](https://github.com/vchoutas/smplx/tree/master/tools).
 
 Download pre-trained model checkpoints for our 3D Shape/Pose network, as well as for 2D Pose 
