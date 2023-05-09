@@ -82,7 +82,7 @@ If the files are placed elsewhere, you will need to update `configs/paths.py` ac
 ## Inference
 `scripts/run_predict.py` is used to run inference on a given folder of input images. For example, to run inference on the demo folder, do:
 ```
-python scripts/run_predict.py --image_dir ./demo/ --save_dir ./pred_output/ -VS -VU -VXYZ
+python scripts/run_predict.py --image_dir assets/demo_images/ --save_dir pred_output/ -VS -VU -VXYZ
 ```
 This will first detect human bounding boxes in the input images using Mask-RCNN. If your input images are already cropped and centred around the subject of interest, 
 you may skip this step using `--cropped_images` as an option. To greatky increase inference speed, remove the options `-VS -VXYZ` to skip directional variance and 
@@ -90,7 +90,7 @@ sample visualisation, and only render the predicted pose and shape point estimat
 
 `scripts/run_optimise.py` is used to run post-inference optimisation, with:
 ```
-python scripts/run_optimise.py --pred_image_dir ./demo/ --pred_output_dir ./pred_output/ --save_dir ./opt_output/
+python scripts/run_optimise.py --pred_image_dir assets/demo_images/ --pred_output_dir pred_output/ --save_dir opt_output/
 ```
 This minimises reprojection error between 2D keypoints and the 3D point estimate. 
 The predicted pose and shape distribution is used as an image-conditioned prior, to guide the optimisation process.
