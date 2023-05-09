@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from smplx.lbs import batch_rodrigues
 
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from utils.renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from metrics.eval_metrics_tracker import EvalMetricsTracker
 
@@ -52,7 +52,7 @@ def evaluate_humaniflow(humaniflow_model,
                                                   img_wh=humaniflow_cfg.DATA.PROXY_REP_SIZE,
                                                   projection_type='orthographic',
                                                   render_rgb=False,
-                                                  bin_size=32)
+                                                  bin_size=None)
 
     if save_per_frame_metrics:
         fname_per_frame = []
@@ -155,7 +155,7 @@ def evaluate_humaniflow(humaniflow_model,
                                                               img_wh=humaniflow_cfg.DATA.PROXY_REP_SIZE,
                                                               projection_type='orthographic',
                                                               render_rgb=False,
-                                                              bin_size=32)
+                                                              bin_size=None)
 
                 wp_render_output = silhouette_renderer(vertices=pred_vertices_flipped_point_est,
                                                        cam_t=cam_t,

@@ -6,8 +6,8 @@ from tqdm import tqdm
 
 from smplx.lbs import batch_rodrigues
 
-from data.load_optimise_data import load_optimise_data_from_pred_output
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from data.load_optimise_data import load_opt_initialise_data_from_pred_output
+from utils.renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 from utils.cam_utils import orthographic_project_torch
 from utils.label_conversions import ALL_JOINTS_TO_COCO_MAP
 from utils.joints2d_utils import undo_keypoint_normalisation
@@ -26,8 +26,8 @@ def optimise_batch_with_humaniflow_prior(humaniflow_model,
                                          visualise_wh=512):
 
     # ------------------- LOAD PREDICTION OUTPUTS AND INITIALISE OPTIMISATION VARIABLES -------------------
-    data = load_optimise_data_from_pred_output(pred_image_dir,
-                                               pred_output_dir)
+    data = load_opt_initialise_data_from_pred_output(pred_image_dir,
+                                                     pred_output_dir)
     batch_size = data['cropped_image'].shape[0]
 
     # Optimisation variables
@@ -150,7 +150,7 @@ def optimise_batch_with_humaniflow_prior(humaniflow_model,
                                                 img_wh=visualise_wh,
                                                 projection_type='orthographic',
                                                 render_rgb=True,
-                                                bin_size=32)
+                                                bin_size=None)
         lights_rgb_settings = {'location': torch.tensor([[0., -0.8, -2.0]], device=device, dtype=torch.float32),
                                'ambient_color': 0.5 * torch.ones(1, 3, device=device, dtype=torch.float32),
                                'diffuse_color': 0.3 * torch.ones(1, 3, device=device, dtype=torch.float32),

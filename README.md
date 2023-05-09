@@ -63,9 +63,9 @@ Place the SMPL model files and network checkpoints in the `model_files` director
     └── ...
  
 ## Inference
-`run_predict.py` is used to run inference on a given folder of input images. For example, to run inference on the demo folder, do:
+`scripts/run_predict.py` is used to run inference on a given folder of input images. For example, to run inference on the demo folder, do:
 ```
-python run_predict.py --image_dir ./demo/ --save_dir ./output/ --visualise_samples --visualise_uncropped
+python scripts/run_predict.py --image_dir ./demo/ --save_dir ./output/ --visualise_samples --visualise_uncropped
 ```
 This will first detect human bounding boxes in the input images using Mask-RCNN. If your input images are already cropped and centred around the subject of interest, you may skip this step using `--cropped_images` as an option. The 3D Shape/Pose network is somewhat sensitive to cropping and centering - this is a good place to start troubleshooting in case of poor results.
 
@@ -75,7 +75,7 @@ Inference can be slow due to the rejection sampling procedure used to estimate p
 TODO
 
 ## Training
-`run_train.py` is used to train our method using random synthetic training data (rendered on-the-fly during training). 
+`scripts/run_train.py` is used to train our method using random synthetic training data (rendered on-the-fly during training). 
 
 Download .npz files containing SMPL training/validation body poses and textures from [here](https://drive.google.com/drive/folders/1lvxwKcqi4HaxTLQlEicPhN5Q3L-aWjYN?usp=sharing). Place these files in a `./train_files` directory, or update the appropriate variables in `configs/paths.py` with paths pointing to the these files. Note that the SMPL textures are from [SURREAL](https://github.com/gulvarol/surreal) and [MultiGarmentNet](https://github.com/bharat-b7/MultiGarmentNetwork).
 
@@ -93,7 +93,7 @@ train_files
 
 Finally, start training with:
 ```
-python run_train.py -E experiments/exp_001
+python scripts/run_train.py -E experiments/exp_001
 ```
 As a sanity check, the script should find 91106 training poses, 125 + 792 training textures, 397582 training backgrounds, 33347 validation poses, 32 + 76 validation textures and 3000 validation backgrounds.
 

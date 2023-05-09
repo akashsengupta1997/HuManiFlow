@@ -2,6 +2,8 @@ import os
 import numpy as np
 import torch
 import argparse
+import sys
+sys.path.append('.')
 
 from configs.humaniflow_config import get_humaniflow_cfg_defaults
 from configs import paths

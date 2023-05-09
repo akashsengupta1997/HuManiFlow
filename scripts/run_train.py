@@ -3,9 +3,11 @@ import numpy as np
 import torch
 import torch.optim as optim
 import argparse
+import sys
+sys.path.append('.')
 
 from data.on_the_fly_smpl_train_dataset import OnTheFlySMPLTrainDataset
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from utils.renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from models.humaniflow_model import HumaniflowModel
 from models.smpl import SMPL

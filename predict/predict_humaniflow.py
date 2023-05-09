@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from predict.predict_hrnet import predict_hrnet
 
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from utils.renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from utils.image_utils import batch_crop_pytorch_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch
@@ -44,7 +44,7 @@ def predict_humaniflow(humaniflow_model,
                                             img_wh=visualise_wh,
                                             projection_type='orthographic',
                                             render_rgb=True,
-                                            bin_size=32)
+                                            bin_size=None)
     lights_rgb_settings = {'location': torch.tensor([[0., -0.8, -2.0]], device=device, dtype=torch.float32),
                            'ambient_color': 0.5 * torch.ones(1, 3, device=device, dtype=torch.float32),
                            'diffuse_color': 0.3 * torch.ones(1, 3, device=device, dtype=torch.float32),

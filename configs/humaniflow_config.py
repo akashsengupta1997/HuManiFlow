@@ -13,7 +13,7 @@ _C.MODEL.NUM_SMPL_BETAS = 10
 
 _C.MODEL.NORM_FLOW = CfgNode()
 _C.MODEL.NORM_FLOW.CONTEXT_DIM = 64
-_C.MODEL.NORM_FLOW.NUM_TRANSFORMS = 2 #3
+_C.MODEL.NORM_FLOW.NUM_TRANSFORMS = 2
 _C.MODEL.NORM_FLOW.TRANSFORM_TYPE = 'spline_coupling'  # options: ['spline_coupling', 'spline_masked', 'affine_coupling', 'affine_masked', 'additive_coupling']
 _C.MODEL.NORM_FLOW.TRANSFORM_NN_HIDDEN_DIMS = [64, 32, 32]
 _C.MODEL.NORM_FLOW.NUM_SPLINE_SEGMENTS = 8

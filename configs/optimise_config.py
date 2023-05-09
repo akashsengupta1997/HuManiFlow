@@ -3,8 +3,8 @@ from yacs.config import CfgNode
 
 _C = CfgNode()
 
-_C.LR = 0.0004
-_C.NUM_ITERS = 151
+_C.LR = 0.0001
+_C.NUM_ITERS = 81
 _C.JOINTS2D_VISIB_THRESHOLD = 0.75
 
 _C.LOSS_WEIGHTS = CfgNode()

@@ -2,6 +2,8 @@ import os
 import torch
 import numpy as np
 import argparse
+import sys
+sys.path.append('.')
 
 from models.humaniflow_model import HumaniflowModel
 from models.smpl import SMPL
