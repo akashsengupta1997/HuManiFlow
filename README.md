@@ -101,7 +101,7 @@ A description of the metrics used to evaluate predicted distributions is given i
 Download SSP-3D from [here](https://github.com/akashsengupta1997/SSP-3D). Update `configs/paths.py` with the path pointing to the un-zipped SSP-3D directory. 
 Evaluate on SSP-3D with:
 ```
-python scripts/run_evaluate.py -D ssp3d -B 32 -N 10
+python scripts/run_evaluate.py -D ssp3d -B 32 -N 100
 ```
 To change the number of samples used for sample-based distribution evaluation metrics, update the `-N` argument. 
 Using more samples will give better measures of sample-input consistency and sample diversity, but will slow down evaluation. 
