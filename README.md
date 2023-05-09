@@ -29,10 +29,15 @@ If you find this code useful in your research, please cite the following publica
 - Python ≥ 3.7
 
 ### Instructions
+First clone the repo:
+```
+git clone https://github.com/akashsengupta1997/HuManiFlow.git
+
+```
 We recommend using a virtual environment to install relevant dependencies:
 ```
-python3 -m venv HuManiFlow
-source HuManiFlow/bin/activate
+python3 -m venv HuManiFlow_env
+source HuManiFlow_env/bin/activate
 ```
 Install torch and torchvision (the code has been tested with v1.9.0 of torch), as well as other dependencies: 
 ```
