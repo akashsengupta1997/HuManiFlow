@@ -473,7 +473,6 @@ class EvalMetricsTracker:
             elif metric_type == 'joints3D_invis_sample_diversity':
                 mult = 1000.  # mult used to convert 3D metrics from metres to millimetres
                 if self.metric_sums['num_invis_joints3Dsamples'] > 0:
-                    print('Check total samples:', metric_type, self.metric_sums['num_invis_joints3Dsamples'])
                     final_metrics[metric_type] = self.metric_sums[metric_type] / self.metric_sums['num_invis_joints3Dsamples']
                 else:
                     print('No invisible 3D COCO joints!')
