@@ -29,7 +29,7 @@ def copy_lsun_images_to_train_files_dir(lsun_dir, train_files_dir):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--lsun_dir', type=str)
-    parser.add_argument('--train_files_dir', type=str)
+    parser.add_argument('--train_files_dir', type=str, default='./train_files/')
     args = parser.parse_args()
 
     copy_lsun_images_to_train_files_dir(lsun_dir=args.lsun_dir,
