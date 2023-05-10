@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import pickle
 import argparse
+from tqdm import tqdm
 import sys
 sys.path.append('.')
 
@@ -115,7 +116,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
                              for f in os.listdir(os.path.join(dataset_path, 'sequenceFiles', 'test'))
                              if f.endswith('.pkl')])
 
-    for filename in sequence_files:
+    for filename in tqdm(sequence_files):
         print('\n\n\n', filename)
         with open(filename, 'rb') as f:
             data = pickle.load(f, encoding='latin1')
@@ -143,12 +144,12 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
         cam_K = torch.from_numpy(cam_K[None, :]).float().to(device)
         for person_num in range(num_people):
             # Get valid frames flags, shape and gender
-            valid_frames = valid[person_num].astype(np.bool)
+            valid_frames = valid[person_num].astype(bool)
             shape = smpl_betas[person_num][:10]
             torch_shape = torch.from_numpy(shape[None, :]).float().to(device)
             gender = genders[person_num]
 
-            for frame_num in range(num_frames):
+            for frame_num in tqdm(range(num_frames)):
                 if valid_frames[frame_num]:  # Only proceed if frame has valid camera pose for person
                     # Get bounding box using projected vertices
                     pose = smpl_poses[person_num][frame_num]
