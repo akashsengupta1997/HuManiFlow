@@ -1,7 +1,7 @@
 # HuManiFlow: Ancestor-Conditioned Normalising Flows on SO(3) Manifolds for Human Pose and Shape Distribution Estimation
 Akash Sengupta, Ignas Budvytis, Roberto Cipolla  
 CVPR 2023  
-[[paper+supplementary]()]
+[[paper+supplementary]()] (TBA on arXiv) 
 
 [//]: # ([[poster]&#40;&#41;][[results video]&#40;&#41;])
 
