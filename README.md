@@ -4,7 +4,7 @@ Code repository for the paper:
 **HuManiFlow: Ancestor-Conditioned Normalising Flows on SO(3) Manifolds for Human Pose and Shape Distribution Estimation**  
 [Akash Sengupta](https://akashsengupta1997.github.io/), [Ignas Budvytis](http://mi.eng.cam.ac.uk/~ib255/), [Roberto Cipolla](https://mi.eng.cam.ac.uk/~cipolla/)  
 CVPR 2023  
-[[paper+supplementary](https://arxiv.org/abs/2305.06968)]
+[[paper+supplementary](https://arxiv.org/abs/2305.06968)][[video](https://www.youtube.com/watch?v=6xDiJNzPYNI)]
 
 This paper presents a probabilistic approach to 3D human shape and pose estimation, which aims to improve sample-input consistency and sample diversity over contemporary methods.
 
