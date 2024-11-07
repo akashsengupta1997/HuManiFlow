@@ -85,7 +85,7 @@ If the files are placed elsewhere, you will need to update `configs/paths.py` ac
 python scripts/run_predict.py --image_dir assets/demo_images/ --save_dir pred_output/ -VS -VU -VXYZ
 ```
 This will first detect human bounding boxes in the input images using Mask-RCNN. If your input images are already cropped and centred around the subject of interest, 
-you may skip this step using `--cropped_images` as an option. To greatky increase inference speed, remove the options `-VS -VXYZ` to skip directional variance and 
+you may skip this step using `--cropped_images` as an option. To greatly increase inference speed, remove the options `-VS -VXYZ` to skip directional variance and 
 sample visualisation, and only render the predicted pose and shape point estimate.
 
 `scripts/run_optimise.py` is used to run post-inference optimisation, with:
