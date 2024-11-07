@@ -61,7 +61,10 @@ def predict_humaniflow(humaniflow_model,
     humaniflow_model.pose_so3flow_transform_modules.eval()
     if object_detect_model is not None:
         object_detect_model.eval()
-    for image_fname in tqdm(sorted([f for f in os.listdir(image_dir) if f.endswith(('.jpg', '.png'))])):
+
+    img_ext = (".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG")
+
+    for image_fname in tqdm(sorted([f for f in os.listdir(image_dir) if f.endswith(img_ext)])):
         with torch.no_grad():
             # ------------------------- INPUT LOADING AND PROXY REPRESENTATION GENERATION -------------------------
             image = cv2.cvtColor(cv2.imread(os.path.join(image_dir, image_fname)), cv2.COLOR_BGR2RGB)
